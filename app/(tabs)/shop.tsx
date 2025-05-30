@@ -1,10 +1,9 @@
-import { Fonts } from '@/constants/Fonts';
 import { supabase } from '@/lib/supabase';
-import { ProductCard } from '@/styles/productCard';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -14,9 +13,9 @@ import {
     FlatList,
     Image,
     Modal,
-    Platform,
     Pressable,
-    RefreshControl, StatusBar as RNStatusBar, ScrollView,
+    RefreshControl,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -24,11 +23,11 @@ import {
     TouchableWithoutFeedback,
     View
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const CARD_HORIZONTAL_PADDING = 16;
-const CARD_MARGIN = 8; 
+const CARD_MARGIN = 8;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH = (width - (CARD_HORIZONTAL_PADDING * 2) - (CARD_MARGIN * (NUM_COLUMNS -1))) / NUM_COLUMNS;
 
@@ -102,7 +101,6 @@ const ShopScreen = () => {
     const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
     const [hasNewNotificationsForBell, setHasNewNotificationsForBell] = useState(false);
     const notificationsMenuFadeAnim = useRef(new Animated.Value(0)).current;
-    const insets = useSafeAreaInsets();
 
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -277,8 +275,62 @@ const ShopScreen = () => {
             setIsRefreshing(false);
         });
     }, [searchQuery, selectedCategoryId]);
+
+
+    const renderProductCard = (item: Product, cardWidth = CARD_WIDTH) => (
+        <Animated.View
+            key={item.id} 
+            style={[styles.productCard, { width: cardWidth }]}
+        >
+            <TouchableOpacity
+                activeOpacity={0.8}
+                style={{ flex: 1 }}
+                onPress={() => router.push({
+                    pathname: `../product/${item.id}`, 
+                    params: { name: item.name, categoryId: item.category_id }
+                })}
+            >
+                <View style={styles.productImageContainer}>
+                    <Image
+                        source={{ uri: item.image_url || 'https://placehold.co/600x400/E2E8F0/A0AEC0?text=No+Image' }}
+                        style={styles.productImage}
+                        accessibilityLabel={item.name}
+                    />
+                    {item.is_featured && (
+                        <View style={styles.featuredBadgeOnCard}>
+                            <Ionicons name="star" size={10} color="#000000" style={{marginRight: 4}}/>
+                            <Text style={styles.featuredBadgeTextOnCard}>Featured</Text>
+                        </View>
+                    )}
+                </View>
+                <View style={styles.productInfo}>
+                    <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.productCategory}>{item.category_name || 'Uncategorized'}</Text>
+                    <View style={styles.productFooter}>
+                        <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+                        {item.rating !== null && item.rating !== undefined && (
+                            <View style={styles.ratingContainer}>
+                                <Ionicons name="star" size={14} color="#FFC94D" />
+                                <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+                            </View>
+                        )}
+                    </View>
+                     <TouchableOpacity 
+                        style={styles.viewDetailsButton}
+                        onPress={() => router.push({
+                            pathname: `../product/${item.id}`, 
+                            params: { name: item.name, categoryId: item.category_id }
+                        })}
+                    >
+                        <Text style={styles.viewDetailsButtonText}>View Details</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{marginLeft: 6}}/>
+                    </TouchableOpacity>
+                </View>
+            </TouchableOpacity>
+        </Animated.View>
+    );
     
-    /*const renderRelatedProducts = () => {
+    const renderRelatedProducts = () => {
         if (isLoadingProducts || Object.keys(relatedProducts).length === 0 || searchQuery.trim()) return null;
 
         return (
@@ -318,7 +370,7 @@ const ShopScreen = () => {
                 })}
             </View>
         );
-    };*/
+    };
     
     const handleProfilePressHeader = useCallback(() => setIsProfileOptionsVisible(p => !p), []);
     const clearAllUserDataForHeader = async () => { await AsyncStorage.multiRemove(['@userToken', '@userProfile', SHARED_SCANNED_ITEMS_STORAGE_KEY, LAST_SEEN_SCAN_COUNT_KEY]); };
@@ -341,7 +393,7 @@ const ShopScreen = () => {
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <RNStatusBar barStyle="dark-content" />
+            <StatusBar style="dark" />
             <LinearGradient colors={['#FFFFFF', '#F7F9FC']} style={styles.background}>
             
             <View style={styles.header}>
@@ -364,7 +416,7 @@ const ShopScreen = () => {
                     />
                 </View>
                 <Pressable onPress={handleBellPressHeader} style={styles.notificationBellContainer}>
-                    <Ionicons name="notifications-outline" size={28} color="#000000" />
+                    <Ionicons name="notifications-outline" size={28} color="#1D2939" />
                     {hasNewNotificationsForBell && <View style={styles.notificationDot} />}
                 </Pressable>
             </View>
@@ -385,13 +437,13 @@ const ShopScreen = () => {
                 {!searchQuery.trim() && (
                     <>
                         <View style={styles.pageTitleContainer}>
-                            <Text style={Fonts.title}>Allergy-Friendly Shop</Text>
-                            <Text style={Fonts.body}>Safe products for your needs</Text>
+                            <Text style={styles.title}>Allergy-Friendly Shop</Text>
+                            <Text style={styles.subtitle}>Safe products for your needs</Text>
                         </View>
 
                         {featuredProducts.length > 0 && (
                             <View style={styles.featuredSection}>
-                                <Text style={[Fonts.subtitle, {paddingBottom: 15}]}>Featured Products</Text>
+                                <Text style={styles.sectionTitle}>Featured Products</Text>
                                 <ScrollView
                                     horizontal
                                     showsHorizontalScrollIndicator={false}
@@ -409,8 +461,8 @@ const ShopScreen = () => {
                                                 <TouchableOpacity 
                                                     activeOpacity={0.8} 
                                                     onPress={() => router.push({
-                                                        pathname: `/product/[id]`, 
-                                                        params: { id: product.id, name: product.name, categoryId: product.category_id }
+                                                        pathname: `../product/${product.id}`, 
+                                                        params: { name: product.name, categoryId: product.category_id }
                                                     })}
                                                 >
                                                     <Image 
@@ -510,29 +562,11 @@ const ShopScreen = () => {
                                     key={product.id} 
                                     style={styles.productGridItemContainer}
                                 >
-                                    <ProductCard
-                                        id={product.id}
-                                        name={product.name}
-                                        price={product.price}
-                                        imageUrl={product.image_url}
-                                        category={product.category_name}
-                                        rating={product.rating}
-                                        isFeatured={product.is_featured}
-                                        onPress={() =>
-                                            router.push({
-                                            pathname: '/product/[id]',
-                                            params: {
-                                                id: product.id,
-                                                name: product.name,
-                                                categoryId: product.category_id,
-                                            },
-                                            })
-                                        }
-                                    />
+                                    {renderProductCard(product)}
                                 </View>
                             ))}
                         </View>
-                        {!searchQuery.trim() /*&& renderRelatedProducts()*/ }
+                        {!searchQuery.trim() && renderRelatedProducts()}
                     </Animated.View>
                 )}
             </ScrollView>
@@ -540,7 +574,7 @@ const ShopScreen = () => {
             <Modal animationType="fade" transparent={true} visible={isProfileOptionsVisible} onRequestClose={() => setIsProfileOptionsVisible(false)}>
                 <TouchableWithoutFeedback onPress={() => setIsProfileOptionsVisible(false)}>
                 <View style={styles.modalOverlay_homeScreen}>
-                    <Animated.View style={[styles.profileOptionsModal_homeScreen, { opacity: menuFadeAnim, top: (Platform.OS === 'ios' ? insets.top : 0) + 60, left: 16 }]}>
+                    <Animated.View style={[styles.profileOptionsModal_homeScreen, { opacity: menuFadeAnim, }]}>
                     {(currentUserProfile?.full_name || currentUserProfile?.username) && (<View style={styles.modalProfileHeader_homeScreen}><Text style={styles.modalProfileName_homeScreen} numberOfLines={1}>{currentUserProfile.full_name || currentUserProfile.username}</Text>{currentUserProfile.full_name && currentUserProfile.username && (<Text style={styles.modalProfileUsername_homeScreen} numberOfLines={1}>@{currentUserProfile.username}</Text>)}</View>)}
                     <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleVisitProfileHeader}><Ionicons name="person-outline" size={20} color="#344054" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Visit Profile</Text></TouchableOpacity>
                     <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleChangeAccountHeader}><Ionicons name="swap-horizontal-outline" size={20} color="#344054" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Change Account</Text></TouchableOpacity>
@@ -553,7 +587,7 @@ const ShopScreen = () => {
             <Modal animationType="fade" transparent={true} visible={isNotificationsModalVisible} onRequestClose={() => setIsNotificationsModalVisible(false)}>
                 <TouchableWithoutFeedback onPress={() => setIsNotificationsModalVisible(false)}>
                 <View style={styles.modalOverlay_homeScreen}>
-                    <Animated.View style={[styles.notificationsModal_homeScreen, { opacity: notificationsMenuFadeAnim, top: (Platform.OS === 'ios' ? insets.top : 0) + 60, right: 16 }]}>
+                    <Animated.View style={[styles.notificationsModal_homeScreen, { opacity: notificationsMenuFadeAnim }]}>
                     <View style={styles.modalHeader_homeScreen_notifications}><Text style={styles.modalTitle_homeScreen_notifications}>Recent Scans</Text></View>
                     {scannedItemsForBell.length > 0 ? (<FlatList data={scannedItemsForBell.slice(0, 15)} keyExtractor={(item) => item.id} renderItem={({ item, index }) => (<View style={[styles.notificationItem_homeScreen, index === scannedItemsForBell.slice(0,15).length -1 && styles.notificationItemLast_homeScreen]}><Ionicons name="barcode-outline" size={22} color="#4EA8DE" style={styles.notificationItemIcon_homeScreen} /><View style={styles.notificationItemContent_homeScreen}><Text style={styles.notificationItemText_homeScreen} numberOfLines={2}>{item.name}</Text><Text style={styles.notificationItemTimestamp_homeScreen}>{new Date(item.scannedAt).toLocaleDateString()} {new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'})}</Text></View></View>)}/>) : ( <View style={styles.notificationItem_homeScreen}><Text style={styles.noNotificationsText_homeScreen}>No scan notifications yet.</Text></View> )}
                     {scannedItemsForBell.length > 0 && (<TouchableOpacity style={styles.clearHistoryButton_homeScreen} onPress={handleClearSharedScanHistoryForBell}><Ionicons name="trash-outline" size={18} color="#D92D20" style={{marginRight: 8}}/><Text style={styles.clearHistoryButtonText_homeScreen}>Clear Notification History</Text></TouchableOpacity>)}
@@ -575,13 +609,17 @@ const styles = StyleSheet.create({
     background: { 
         flex: 1, 
     },
-    header: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        margin: 10,
-        marginBottom: 5, 
-        paddingTop: Platform.OS === 'ios' ? 0 : 5 
-    },
+    header: {
+        paddingTop: 10,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        backgroundColor: '#F7F9FC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F7F9FC',
+      },
       profileContainer: {
         width: 42,
         height: 42,
@@ -617,7 +655,7 @@ const styles = StyleSheet.create({
       searchIcon: { marginRight: 8 },
       searchInput: {
         flex: 1,
-        color: '#000000',
+        color: '#1D2939',
         fontSize: 15,
         paddingVertical: 0,
         marginVertical: 0,
@@ -698,13 +736,13 @@ const styles = StyleSheet.create({
     sectionTitle: { 
         fontSize: 20, 
         fontWeight: 'bold', 
-        color: '#000000', 
+        color: '#1D2939', 
         marginBottom: 16, 
     },
     searchResultsTitle: { 
         fontSize: 20, 
         fontWeight: 'bold', 
-        color: '#000000', 
+        color: '#1D2939', 
         marginVertical: 20, 
         textAlign: 'center' 
     },
@@ -735,7 +773,7 @@ const styles = StyleSheet.create({
     featuredProductName: { 
         fontSize: 16, 
         fontWeight: '600', 
-        color: '#000000', 
+        color: '#1D2939', 
         marginBottom: 5, 
     },
     featuredProductPrice: { 
@@ -782,7 +820,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         left: 8,
-        backgroundColor: 'rgba(255, 190, 11, 0.9)', 
+        backgroundColor: '#E3E430', 
         borderRadius: 6,
         paddingHorizontal: 7,
         paddingVertical: 4,
@@ -790,7 +828,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     featuredBadgeTextOnCard: {
-        color: '#FFFFFF',
+        color: '#000000',
         fontSize: 10,
         fontWeight: 'bold',
     },
@@ -800,7 +838,7 @@ const styles = StyleSheet.create({
     productName: {
         fontSize: 14, 
         fontWeight: '600',
-        color: '#000000',
+        color: '#1D2939',
         marginBottom: 3,
         minHeight: 36, 
     },
@@ -819,7 +857,7 @@ const styles = StyleSheet.create({
     productPrice: {
         fontSize: 15, 
         fontWeight: 'bold',
-        color: '#276FDB',
+        color: '#4EA8DE',
     },
     ratingContainer: { 
         flexDirection: 'row', 
@@ -967,7 +1005,7 @@ const styles = StyleSheet.create({
     modalProfileName_homeScreen: { 
         fontSize: 16, 
         fontWeight: '600', 
-        color: '#000000', 
+        color: '#1D2939', 
     },
     modalProfileUsername_homeScreen: { 
         fontSize: 13, 
@@ -1015,7 +1053,7 @@ const styles = StyleSheet.create({
     modalTitle_homeScreen_notifications: { 
         fontSize: 17, 
         fontWeight: '600', 
-        color: '#000000', 
+        color: '#1D2939', 
     },
     notificationItem_homeScreen: { 
         flexDirection: 'row', 

@@ -193,7 +193,7 @@ const AdminManageCategoriesScreen = () => {
       <Stack.Screen options={{ title: 'Admin: Manage Categories' }} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.pageHeader}>
-          <Ionicons name="pricetags-outline" size={32} color="#000000" />
+          <Ionicons name="pricetags-outline" size={32} color="#2D3748" />
           <Text style={styles.pageTitle}>Manage Categories</Text>
         </View>
         <Text style={styles.pageSubtitle}>Add, edit, or remove product categories.</Text>
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 20, fontWeight: '700', color: '#1A202C', marginBottom: 20, textAlign: 'center' },
   formField: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', color: '#4A5568', marginBottom: 6 },
-  input: { backgroundColor: '#F7FAFC', borderColor: '#E0E0E0', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#000000' },
+  input: { backgroundColor: '#F7FAFC', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#2D3748' },
   submitButton: { backgroundColor: '#38A169', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   updateButton: { backgroundColor: '#DD6B20' },
   submitButtonDisabled: { backgroundColor: '#A0AEC0' },
@@ -282,11 +282,11 @@ const styles = StyleSheet.create({
   cancelEditButton: { backgroundColor: '#EDF2F7', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   cancelEditButtonText: { color: '#4A5568', fontSize: 15, fontWeight: '500' },
   listSection: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#000000', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', paddingBottom: 8 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#2D3748', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 8 },
   emptyListText: { textAlign:'center', color: '#667085', paddingVertical: 20},
   listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EAF0F6' },
   listItemTextContainer: { flex: 1, marginRight: 8 },
-  listItemName: { fontSize: 16, fontWeight: '600', color: '#000000' },
+  listItemName: { fontSize: 16, fontWeight: '600', color: '#2D3748' },
   listItemActions: { flexDirection: 'row' },
   actionIcon: { padding: 8 },
   editIcon: { marginRight: 0 },

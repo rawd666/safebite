@@ -1,30 +1,30 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    Image,
-    ActivityIndicator,
-    TouchableOpacity,
-    Dimensions,
-    Linking,
-    Animated,
-    TextInput,
-    FlatList,
-    Modal,
-    TouchableWithoutFeedback, Alert,
-    Pressable,
-    Platform
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, router, Stack, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
+} from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height: screenHeight } = Dimensions.get('window');
 const RELATED_CARD_WIDTH = width * 0.4;
@@ -236,7 +236,7 @@ const ProductDetailScreen = () => {
     setIsPanelExpanded(!isPanelExpanded);
   };
 
-  if (isLoadingProduct) { return (<SafeAreaView style={styles.safeAreaViewContainer}><View style={styles.loadingContainer}><ActivityIndicator size="large" color="#3A86FF" /><Text style={styles.loadingText}>Loading Product Details...</Text></View></SafeAreaView>); }
+  if (isLoadingProduct) { return (<SafeAreaView style={styles.safeAreaViewContainer}><View style={styles.loadingContainer}><ActivityIndicator size="large" color="#4EA8DE" /><Text style={styles.loadingText}>Loading Product Details...</Text></View></SafeAreaView>); }
   if (error && !product) { return (<SafeAreaView style={styles.safeAreaViewContainer}><Stack.Screen options={{ title: "Error", headerBackVisible: true, headerTransparent: false, headerStyle:{backgroundColor: '#F7F9FC'}, headerTintColor: '#1D2939' }} /><View style={styles.errorContainer}><Ionicons name="alert-circle-outline" size={60} color="#D92D20" /><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => router.back()} style={styles.actionButton}><Text style={styles.actionButtonText}>Go Back</Text></TouchableOpacity></View></SafeAreaView>); }
   if (!product) { return (<SafeAreaView style={styles.safeAreaViewContainer}><Stack.Screen options={{ title: "Product Not Found", headerBackVisible: true, headerTransparent: false, headerStyle:{backgroundColor: '#F7F9FC'}, headerTintColor: '#1D2939' }} /><View style={styles.errorContainer}><Ionicons name="sad-outline" size={60} color="#98A2B3" /><Text style={styles.errorText}>Sorry, this product could not be found.</Text><TouchableOpacity onPress={() => router.back()} style={styles.actionButton}><Text style={styles.actionButtonText}>Back to Shop</Text></TouchableOpacity></View></SafeAreaView>); }
 
@@ -262,7 +262,7 @@ const ProductDetailScreen = () => {
                         coordinate={{ latitude: store.latitude, longitude: store.longitude }}
                         title={store.store_name}
                         description={store.store_address || ''}
-                        pinColor="#3A86FF"
+                        pinColor="#4EA8DE"
                         onPress={() => handleViewOnMap(store)}
                     />
                 )
@@ -274,7 +274,7 @@ const ProductDetailScreen = () => {
                 <Ionicons name="arrow-back-outline" size={26} color="#1D2939" />
             </TouchableOpacity>
             <Pressable onPress={handleProfilePressHeader} style={styles.productDetail_HeaderProfileContainer}>
-                {loadingProfile ? <ActivityIndicator size="small" color="#5E7CE2" />
+                {loadingProfile ? <ActivityIndicator size="small" color="#4EA8DE" />
                     : currentUserProfile?.avatar_url ? <Image source={{ uri: currentUserProfile.avatar_url }} style={styles.productDetail_HeaderProfileImage} resizeMode="cover" />
                     : <Ionicons name="person-outline" size={20} color="#A0AEC0" />
                 }
@@ -306,7 +306,7 @@ const ProductDetailScreen = () => {
             >
                 <View style={styles.bottomPanelContentContainer}>
                     <Text style={styles.bottomPanelProductName} numberOfLines={2}>{product.name}</Text>
-                    {product.category_name && <Text style={styles.bottomPanelProductCategory}><Ionicons name="pricetag-outline" size={14} color="#3A86FF"/> {product.category_name}</Text>}
+                    {product.category_name && <Text style={styles.bottomPanelProductCategory}><Ionicons name="pricetag-outline" size={14} color="#4EA8DE"/> {product.category_name}</Text>}
                     <View style={styles.bottomPanelPriceRatingRow}>
                         <Text style={styles.bottomPanelProductPrice}>${product.price.toFixed(2)}</Text>
                         {product.rating !== null && product.rating !== undefined && (<View style={styles.bottomPanelRatingContainer}><Ionicons name="star" size={16} color="#FFBE0B" /><Text style={styles.bottomPanelRatingText}>{product.rating.toFixed(1)}</Text></View>)}
@@ -315,10 +315,10 @@ const ProductDetailScreen = () => {
 
                     <View style={styles.bottomPanelStoreSection}>
                         <Text style={styles.bottomPanelSectionTitle}>Find in Stores</Text>
-                        {isLoadingStores ? (<ActivityIndicator color="#3A86FF" style={{ marginTop: 10, marginBottom: 10 }} />)
+                        {isLoadingStores ? (<ActivityIndicator color="#4EA8DE" style={{ marginTop: 10, marginBottom: 10 }} />)
                         : storeAvailability.length > 0 ? (storeAvailability.map((store, index) => (
                             <View key={store.store_id || index.toString()} style={styles.bottomPanelStoreCard}>
-                                <View style={styles.bottomPanelStoreIconContainer}><Ionicons name="storefront-outline" size={24} color="#3A86FF" /></View>
+                                <View style={styles.bottomPanelStoreIconContainer}><Ionicons name="storefront-outline" size={24} color="#4EA8DE" /></View>
                                 <View style={styles.bottomPanelStoreInfo}>
                                     <Text style={styles.bottomPanelStoreName}>{store.store_name}</Text>
                                     {store.store_address && <Text style={styles.bottomPanelStoreAddress} numberOfLines={2}>{store.store_address}</Text>}
@@ -328,7 +328,7 @@ const ProductDetailScreen = () => {
                                     </View>
                                 </View>
                                 <View style={styles.bottomPanelStoreActions}>
-                                    <TouchableOpacity style={styles.bottomPanelActionButtonSmall} onPress={() => handleViewOnMap(store)}><Ionicons name="map-outline" size={18} color="#3A86FF" /></TouchableOpacity>
+                                    <TouchableOpacity style={styles.bottomPanelActionButtonSmall} onPress={() => handleViewOnMap(store)}><Ionicons name="map-outline" size={18} color="#4EA8DE" /></TouchableOpacity>
                                     <TouchableOpacity style={[styles.bottomPanelActionButtonSmall, styles.bottomPanelDirectionsButton]} onPress={() => handleGetDirections(store)}><Ionicons name="navigate-outline" size={18} color="#FFFFFF" /></TouchableOpacity>
                                 </View>
                             </View>
@@ -345,7 +345,7 @@ const ProductDetailScreen = () => {
                             </ScrollView>
                         </View>
                     )}
-                    {isLoadingRelated && <ActivityIndicator color="#3A86FF" style={{ marginVertical: 15 }} />}
+                    {isLoadingRelated && <ActivityIndicator color="#4EA8DE" style={{ marginVertical: 15 }} />}
                 </View>
             </ScrollView>
         </Animated.View>
@@ -369,7 +369,7 @@ const ProductDetailScreen = () => {
           <View style={styles.productDetail_ModalOverlay}>
             <Animated.View style={[styles.productDetail_NotificationsModal, { opacity: notificationsMenuFadeAnim, top: insets.top + HEADER_VISUAL_HEIGHT + 5, right: 16 }]}>
               <View style={styles.productDetail_ModalHeaderNotifications}><Text style={styles.productDetail_ModalTitleNotifications}>Recent Scans</Text></View>
-              {scannedItemsForBell.length > 0 ? (<FlatList data={scannedItemsForBell.slice(0, 15)} keyExtractor={(item) => item.id} renderItem={({ item, index }) => (<View style={[styles.productDetail_NotificationItem, index === scannedItemsForBell.slice(0,15).length -1 && styles.productDetail_NotificationItemLast]}><Ionicons name="barcode-outline" size={22} color="#3A86FF" style={styles.productDetail_NotificationItemIcon} /><View style={styles.productDetail_NotificationItemContent}><Text style={styles.productDetail_NotificationItemText} numberOfLines={2}>{item.name}</Text><Text style={styles.productDetail_NotificationItemTimestamp}>{new Date(item.scannedAt).toLocaleDateString()} {new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'})}</Text></View></View>)}/>) : ( <View style={styles.productDetail_NotificationItem}><Text style={styles.productDetail_NoNotificationsText}>No scan notifications yet.</Text></View> )}
+              {scannedItemsForBell.length > 0 ? (<FlatList data={scannedItemsForBell.slice(0, 15)} keyExtractor={(item) => item.id} renderItem={({ item, index }) => (<View style={[styles.productDetail_NotificationItem, index === scannedItemsForBell.slice(0,15).length -1 && styles.productDetail_NotificationItemLast]}><Ionicons name="barcode-outline" size={22} color="#4EA8DE" style={styles.productDetail_NotificationItemIcon} /><View style={styles.productDetail_NotificationItemContent}><Text style={styles.productDetail_NotificationItemText} numberOfLines={2}>{item.name}</Text><Text style={styles.productDetail_NotificationItemTimestamp}>{new Date(item.scannedAt).toLocaleDateString()} {new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'})}</Text></View></View>)}/>) : ( <View style={styles.productDetail_NotificationItem}><Text style={styles.productDetail_NoNotificationsText}>No scan notifications yet.</Text></View> )}
               {scannedItemsForBell.length > 0 && (<TouchableOpacity style={styles.productDetail_ClearHistoryButton} onPress={handleClearSharedScanHistoryForBell}><Ionicons name="trash-outline" size={18} color="#D92D20" style={{marginRight: 8}}/><Text style={styles.productDetail_ClearHistoryButtonText}>Clear Notification History</Text></TouchableOpacity>)}
             </Animated.View>
           </View>
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actionButton: {
-    backgroundColor: '#3A86FF',
+    backgroundColor: '#4EA8DE',
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 24,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     paddingBottom: 1,
     paddingTop:40,
     height: '13%',
-    backgroundColor: 'rgba(58, 133, 255, 0.64)',
+    backgroundColor: 'rgba(78, 168, 222, 0.64)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(27, 27, 27, 0)',
     zIndex: 1000,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   },
   bottomPanelProductCategory: {
     fontSize: 13,
-    color: '#3A86FF',
+    color: '#4EA8DE',
     fontWeight: '500',
     marginBottom: 8,
     textAlign: 'left',
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   },
   bottomPanelStorePrice: {
     fontSize: 13,
-    color: '#3A86FF',
+    color: '#4EA8DE',
     fontWeight: '600',
     marginRight: 8,
   },
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   bottomPanelDirectionsButton: {
-    backgroundColor: '#3A86FF',
+    backgroundColor: '#4EA8DE',
     marginRight: 0,
   },
   bottomPanelEmptyStateCard: {
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   relatedProductPrice: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#3A86FF',
+    color: '#4EA8DE',
     textAlign: 'center',
   },
   productDetail_ModalOverlay: {

@@ -1,72 +1,70 @@
-
-import { supabase } from '@/lib/supabase'; // Ensure this path is correct
+import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Constants for AsyncStorage (MUST match those in DetectText.tsx and HomeScreen.tsx)
 const SHARED_SCANNED_ITEMS_STORAGE_KEY = '@scannedItemsHistory';
 const LAST_SEEN_SCAN_COUNT_KEY = '@lastSeenScanCount';
 
-// Interface for items stored in the shared scan history
-interface SharedScannedItem {
+interface SharedScannedItemForBell {
   id: string;
-  name: string; // This is the full scanned text
+  name: string;
   scannedAt: string;
 }
 
-// Interface for processed history items, including allergen info
-interface ProcessedHistoryItem extends SharedScannedItem {
+interface ProcessedHistoryItem {
+  id: string;
+  name: string;
+  scannedAt: string;
+  imageUrl?: string | null;
   detectedAllergensInItem: string[];
   allergenCountInItem: number;
   containsConfiguredAllergens: boolean;
 }
 
-// User profile structure (ensure this matches your Supabase 'profiles' table structure)
 interface UserProfile {
   id: string;
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
-  allergies: string[] | string | null; // Can be an array or a comma-separated string
+  allergies: string[] | string | null;
 }
 
 const ScanHistoryScreen = () => {
-  // Header UI State (Profile Icon & Notification Bell)
+  const insets = useSafeAreaInsets();
   const [isProfileOptionsVisible, setIsProfileOptionsVisible] = useState(false);
   const menuFadeAnim = useRef(new Animated.Value(0)).current;
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [sharedScannedItemsForBell, setSharedScannedItemsForBell] = useState<SharedScannedItem[]>([]);
+  const [sharedScannedItemsForBell, setSharedScannedItemsForBell] = useState<SharedScannedItemForBell[]>([]);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [hasNewNotificationsForBell, setHasNewNotificationsForBell] = useState(false);
   const notificationsMenuFadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Scan History State
   const [processedHistory, setProcessedHistory] = useState<ProcessedHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [userAllergies, setUserAllergies] = useState<string[]>([]);
   const [allergiesConfigured, setAllergiesConfigured] = useState(false);
 
-
-  // --- Header UI Animations & Profile Fetch ---
   useEffect(() => {
     Animated.timing(menuFadeAnim, { toValue: isProfileOptionsVisible ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   }, [isProfileOptionsVisible]);
@@ -83,7 +81,7 @@ const ScanHistoryScreen = () => {
         setCurrentUserProfile(null);
         setUserAllergies([]);
         setAllergiesConfigured(false);
-        return;
+        return null;
       }
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -104,104 +102,109 @@ const ScanHistoryScreen = () => {
         }
         setUserAllergies(currentAllergies);
         setAllergiesConfigured(currentAllergies.length > 0);
+        return profileData;
       } else {
         setCurrentUserProfile(null);
         setUserAllergies([]);
         setAllergiesConfigured(false);
+        return null;
       }
     } catch (error) {
-      console.error("ScanHistoryScreen: Error fetching user profile:", error);
       setCurrentUserProfile(null);
       setUserAllergies([]);
       setAllergiesConfigured(false);
+      return null;
     } finally {
       setLoadingProfile(false);
     }
   };
 
-  // --- Load Scan History and Process Allergens ---
-  const loadScanHistoryAndProcess = async () => {
-    if (!currentUserProfile && !loadingProfile) { // Wait for profile fetch attempt to complete
-        await fetchAppUserProfileAndAllergies(); // Ensure allergies are loaded if not already
+  const loadScanHistoryFromDB = async (profile?: UserProfile | null) => {
+    const userProfileToUse = profile || currentUserProfile;
+
+    if (!userProfileToUse || !userProfileToUse.id) {
+      setIsLoadingHistory(false);
+      setProcessedHistory([]);
+      return;
     }
-    if(!currentUserProfile && loadingProfile) return; // Still loading profile, wait.
 
     setIsLoadingHistory(true);
     try {
-      const storedItemsJson = await AsyncStorage.getItem(SHARED_SCANNED_ITEMS_STORAGE_KEY);
-      const rawHistoryItems: SharedScannedItem[] = storedItemsJson ? JSON.parse(storedItemsJson) : [];
+      const { data: scans, error } = await supabase
+        .from('user_scan_history')
+        .select('id, scan_data, image_url, detected_allergens, scan_date')
+        .eq('user_id', userProfileToUse.id)
+        .order('scan_date', { ascending: false });
 
-      const processed = rawHistoryItems.map(item => {
-        let detectedInThisItem: string[] = [];
-        if (allergiesConfigured && userAllergies.length > 0) {
-          detectedInThisItem = userAllergies.filter(allergen =>
-            item.name.toLowerCase().includes(allergen)
-          );
-        }
-        return {
-          ...item,
-          detectedAllergensInItem: detectedInThisItem,
-          allergenCountInItem: detectedInThisItem.length,
-          containsConfiguredAllergens: detectedInThisItem.length > 0,
-        };
-      });
-      setProcessedHistory(processed);
+      if (error) throw error;
+
+      if (scans) {
+        const processed = scans.map(item => {
+          const detectedInThisItem = item.detected_allergens || [];
+          return {
+            id: item.id,
+            name: item.scan_data?.scanned_text || 'No text extracted',
+            scannedAt: item.scan_date,
+            imageUrl: item.image_url,
+            detectedAllergensInItem: detectedInThisItem,
+            allergenCountInItem: detectedInThisItem.length,
+            containsConfiguredAllergens: detectedInThisItem.length > 0,
+          };
+        });
+        setProcessedHistory(processed);
+      } else {
+        setProcessedHistory([]);
+      }
     } catch (error) {
-      console.error("ScanHistoryScreen: Failed to load or process scan history:", error);
       setProcessedHistory([]);
     } finally {
       setIsLoadingHistory(false);
     }
   };
-  
+
   useEffect(() => {
-    fetchAppUserProfileAndAllergies().then(() => {
-        // After profile and allergies are fetched, load and process history
-        // This ensures userAllergies is set before processing
+    fetchAppUserProfileAndAllergies().then((profile) => {
+        if(profile) {
+            loadScanHistoryFromDB(profile);
+        } else {
+            setIsLoadingHistory(false); // No user, so no history to load
+            setProcessedHistory([]);
+        }
     });
   }, []);
-
-  // Re-process history if userAllergies change (e.g., profile update)
-  useEffect(() => {
-    if (currentUserProfile) { // Only run if profile is loaded
-        loadScanHistoryAndProcess();
-    }
-  }, [currentUserProfile, userAllergies, allergiesConfigured]);
-
 
   useFocusEffect(
     useCallback(() => {
       loadSharedScannedDataForBellNotifications();
-      if (currentUserProfile) { // If profile already loaded, refresh history & allergens
-          loadScanHistoryAndProcess();
-      } else { // Otherwise, ensure profile is fetched first
-          fetchAppUserProfileAndAllergies().then(() => loadScanHistoryAndProcess());
-      }
-    }, [currentUserProfile]) // Add currentUserProfile as dependency
+      fetchAppUserProfileAndAllergies().then((profile) => {
+        if(profile) {
+            loadScanHistoryFromDB(profile);
+        } else {
+            setIsLoadingHistory(false);
+            setProcessedHistory([]);
+        }
+      });
+    }, [])
   );
 
-
-  // --- Notification Bell Logic (for the header on this page) ---
   const loadSharedScannedDataForBellNotifications = async () => {
     try {
       const storedItems = await AsyncStorage.getItem(SHARED_SCANNED_ITEMS_STORAGE_KEY);
-      const items: SharedScannedItem[] = storedItems ? JSON.parse(storedItems) : [];
+      const items: SharedScannedItemForBell[] = storedItems ? JSON.parse(storedItems) : [];
       setSharedScannedItemsForBell(items);
       const lastSeenCountStr = await AsyncStorage.getItem(LAST_SEEN_SCAN_COUNT_KEY);
       const lastSeenCount = lastSeenCountStr ? parseInt(lastSeenCountStr, 10) : 0;
       setHasNewNotificationsForBell(items.length > lastSeenCount);
     } catch (error) {
-      console.error("ScanHistoryScreen: Failed to load SHARED scanned items for bell:", error);
     }
   };
 
-  // --- Header Action Handlers ---
   const handleProfilePress = useCallback(() => setIsProfileOptionsVisible(p => !p), []);
-  const clearAllUserDataForHeaderActions = async () => { /* ... (same as in DetectText) ... */
+  const clearAllUserDataForHeaderActions = async () => {
     await AsyncStorage.multiRemove(['@userToken', '@userProfile', SHARED_SCANNED_ITEMS_STORAGE_KEY, LAST_SEEN_SCAN_COUNT_KEY]);
   };
   const handleVisitProfile = useCallback(() => { setIsProfileOptionsVisible(false); router.push('/(tabs)/profile'); }, []);
-  const handleLogout = useCallback(async () => { /* ... (same as in DetectText, ensure setCurrentUserProfile(null), setUserAllergies([]), setAllergiesConfigured(false) are called) ... */
+  const handleLogout = useCallback(async () => {
     setIsProfileOptionsVisible(false);
     try {
         const { error } = await supabase.auth.signOut();
@@ -209,11 +212,12 @@ const ScanHistoryScreen = () => {
         else {
             await clearAllUserDataForHeaderActions();
             setCurrentUserProfile(null); setUserAllergies([]); setAllergiesConfigured(false);
+            setProcessedHistory([]);
             router.replace('/auth/login');
         }
-    } catch (e) { Alert.alert('Logout Error', (e as Error).message); }
+    } catch (e: any) { Alert.alert('Logout Error', (e as Error).message); }
   }, []);
-  const handleChangeAccount = useCallback(async () => { /* ... (same as handleLogout) ... */
+  const handleChangeAccount = useCallback(async () => {
     setIsProfileOptionsVisible(false);
     try {
         const { error } = await supabase.auth.signOut();
@@ -221,19 +225,20 @@ const ScanHistoryScreen = () => {
         else {
             await clearAllUserDataForHeaderActions();
             setCurrentUserProfile(null); setUserAllergies([]); setAllergiesConfigured(false);
+            setProcessedHistory([]);
             router.replace('/auth/login');
         }
-    } catch (e) { Alert.alert('Logout Error', (e as Error).message); }
+    } catch (e: any) { Alert.alert('Logout Error', (e as Error).message); }
   }, []);
-  const handleBellPress = async () => { /* ... (same as in DetectText, use sharedScannedItemsForBell) ... */
+  const handleBellPress = async () => {
     setIsNotificationsModalVisible(true);
     if (hasNewNotificationsForBell) {
         setHasNewNotificationsForBell(false);
         try { await AsyncStorage.setItem(LAST_SEEN_SCAN_COUNT_KEY, sharedScannedItemsForBell.length.toString()); }
-        catch (e) { console.error("ScanHistory: Bell press error", e); }
+        catch (e) { }
     }
   };
-  const handleClearSharedScanHistoryForBell = async () => { /* ... (same as in DetectText) ... */
+  const handleClearSharedScanHistoryForBell = async () => {
     Alert.alert("Clear Notifications", "Clear all scan notifications?",
         [{ text: "Cancel" }, { text: "Clear", style: "destructive", onPress: async () => {
             setSharedScannedItemsForBell([]); setHasNewNotificationsForBell(false);
@@ -245,13 +250,10 @@ const ScanHistoryScreen = () => {
     );
   };
 
-  // --- Helper to Render Text with Highlighted Allergens ---
   const renderTextWithHighlightedAllergens = (text: string, detected: string[]) => {
-    if (!text || detected.length === 0) {
+    if (!text || !allergiesConfigured || detected.length === 0) {
       return <Text style={styles.historyItemScanText}>{text}</Text>;
     }
-    // Create a regex that matches any of the detected allergens, case-insensitive
-    // Escape special characters in allergens for regex
     const escapedAllergens = detected.map(allergen =>
         allergen.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     );
@@ -271,10 +273,11 @@ const ScanHistoryScreen = () => {
     });
   };
 
-
-  // --- Render History Item ---
   const renderHistoryItem = ({ item }: { item: ProcessedHistoryItem }) => (
     <View style={[styles.historyItemContainer, !item.containsConfiguredAllergens && allergiesConfigured && styles.historyItemSafe]}>
+      {item.imageUrl && (
+        <Image source={{ uri: item.imageUrl }} style={styles.historyItemImagePreview} />
+      )}
       <View style={styles.historyItemHeader}>
         <Text style={styles.historyItemTimestamp}>
           {new Date(item.scannedAt).toLocaleDateString()} - {new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -285,9 +288,9 @@ const ScanHistoryScreen = () => {
                 <Text style={styles.allergenWarningBadgeText}>Allergen{item.allergenCountInItem > 1 ? 's' : ''} Found</Text>
             </View>
         )}
-         {!item.containsConfiguredAllergens && allergiesConfigured && (
+        {!item.containsConfiguredAllergens && allergiesConfigured && (
             <View style={styles.allergenSafeBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#000000" />
+                <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
                 <Text style={styles.allergenSafeBadgeText}>No Allergens</Text>
             </View>
         )}
@@ -312,7 +315,7 @@ const ScanHistoryScreen = () => {
     </View>
   );
 
-  if (loadingProfile && isLoadingHistory) { // Show main loading indicator if both are true initially
+  if (loadingProfile && isLoadingHistory) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
@@ -327,9 +330,24 @@ const ScanHistoryScreen = () => {
     <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'bottom', 'left']}>
       <StatusBar style="dark" />
       <View style={styles.container}>
+        <View style={styles.header_homeScreen}>
+            <Pressable onPress={handleProfilePress} style={styles.profileContainer_homeScreen}>
+              {loadingProfile ? <ActivityIndicator size="small" color="#4EA8DE" />
+                : currentUserProfile?.avatar_url ? <Image source={{ uri: currentUserProfile.avatar_url }} style={styles.profileImage_homeScreen} resizeMode="cover" />
+                  : <View style={styles.profileImagePlaceholder_homeScreen}><Ionicons name="person-outline" size={20} color="#A0AEC0" /></View>
+              }
+            </Pressable>
+            <View style={styles.searchContainer_homeScreen}>
+              <Ionicons name="search-outline" size={18} color="#A0AEC0" style={styles.searchIcon_homeScreen} />
+              <TextInput placeholder="Scan History" placeholderTextColor="#A0AEC0" style={styles.searchInput_homeScreen} editable={false}/>
+            </View>
+            <Pressable onPress={handleBellPress} style={styles.notificationBellContainer_homeScreen}>
+              <Ionicons name="notifications-outline" size={26} color={"#2D3748"} />
+              {hasNewNotificationsForBell && <View style={styles.notificationDot_homeScreen} />}
+            </Pressable>
+        </View>
 
-        {/* Scan History List */}
-        {isLoadingHistory && !processedHistory.length ? ( // Show history-specific loading if profile is loaded but history isn't
+        {isLoadingHistory && !processedHistory.length ? (
              <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#4EA8DE" /><Text style={styles.loadingText}>Loading Scans...</Text></View>
         ) : processedHistory.length > 0 ? (
           <FlatList
@@ -341,21 +359,20 @@ const ScanHistoryScreen = () => {
           />
         ) : (
           <View style={styles.emptyHistoryContainer}>
-            <Ionicons name="document-text-outline" size={60} color="#E0E0E0" />
+            <Ionicons name="document-text-outline" size={60} color="#CBD5E0" />
             <Text style={styles.emptyHistoryText}>No scan history found.</Text>
             <Text style={styles.emptyHistorySubText}>Items you scan will appear here.</Text>
             <Pressable style={styles.scanButton} onPress={() => router.push('/(tabs)/Scan')}>
-                 <Ionicons name="scan-outline" size={20} color="#FFFFFF" style={{marginRight: 8}}/>
+                <Ionicons name="scan-outline" size={20} color="#FFFFFF" style={{marginRight: 8}}/>
                 <Text style={styles.scanButtonText}>Start Scanning</Text>
             </Pressable>
           </View>
         )}
 
-        {/* Profile Options Modal */}
         <Modal animationType="fade" transparent={true} visible={isProfileOptionsVisible} onRequestClose={() => setIsProfileOptionsVisible(false)}>
             <TouchableWithoutFeedback onPress={() => setIsProfileOptionsVisible(false)}>
             <View style={styles.modalOverlay_homeScreen}>
-                <Animated.View style={[styles.profileOptionsModal_homeScreen, { opacity: menuFadeAnim, top: Platform.OS === 'ios' ? 60 : 45, left: 16 }]}>
+                <Animated.View style={[styles.profileOptionsModal_homeScreen, { opacity: menuFadeAnim, top: insets.top + 10, left: 16 }]}>
                 {(currentUserProfile?.full_name || currentUserProfile?.username) && (
                     <View style={styles.modalProfileHeader_homeScreen}>
                     <Text style={styles.modalProfileName_homeScreen} numberOfLines={1}>{currentUserProfile.full_name || currentUserProfile.username}</Text>
@@ -364,19 +381,18 @@ const ScanHistoryScreen = () => {
                     )}
                     </View>
                 )}
-                <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleVisitProfile}><Ionicons name="person-outline" size={20} color="#000000" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Visit Profile</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleChangeAccount}><Ionicons name="swap-horizontal-outline" size={20} color="#000000" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Change Account</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleVisitProfile}><Ionicons name="person-outline" size={20} color="#2D3748" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Visit Profile</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleChangeAccount}><Ionicons name="swap-horizontal-outline" size={20} color="#2D3748" style={styles.modalOptionIcon_homeScreen} /><Text style={styles.modalOptionText_homeScreen}>Change Account</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.modalOptionButton_homeScreen} onPress={handleLogout}><Ionicons name="log-out-outline" size={20} color="#E53E3E" style={styles.modalOptionIcon_homeScreen} /><Text style={[styles.modalOptionText_homeScreen, { color: '#E53E3E' }]}>Logout</Text></TouchableOpacity>
                 </Animated.View>
             </View>
             </TouchableWithoutFeedback>
         </Modal>
 
-        {/* Notifications Modal (for the bell in the header) */}
         <Modal animationType="fade" transparent={true} visible={isNotificationsModalVisible} onRequestClose={() => setIsNotificationsModalVisible(false)}>
             <TouchableWithoutFeedback onPress={() => setIsNotificationsModalVisible(false)}>
             <View style={styles.modalOverlay_homeScreen}>
-                <Animated.View style={[styles.notificationsModal_homeScreen, { opacity: notificationsMenuFadeAnim, top: Platform.OS === 'ios' ? 60 : 45, right: 16 }]}>
+                <Animated.View style={[styles.notificationsModal_homeScreen, { opacity: notificationsMenuFadeAnim, top: insets.top + 10, right: 16 }]}>
                 <View style={styles.modalHeader_homeScreen_notifications}><Text style={styles.modalTitle_homeScreen_notifications}>Recent Scans (Notifications)</Text></View>
                 {sharedScannedItemsForBell.length > 0 ? (
                     <FlatList data={sharedScannedItemsForBell.slice(0, 15)} keyExtractor={(item) => item.id}
@@ -410,7 +426,6 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, fontSize: 16, color: '#4EA8DE' },
   pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#1A202C', marginHorizontal:16, marginBottom: 16, marginTop: 10 },
   listContentContainer: { paddingBottom: 20 },
-
   historyItemContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -423,10 +438,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     borderLeftWidth: 5,
-    borderLeftColor: '#FFC107', // Default/Warning color
+    borderLeftColor: '#CBD5E0',
   },
   historyItemSafe: {
-    borderLeftColor: '#E3E430', // Green for safe
+    borderLeftColor: '#4CAF50',
+  },
+  historyItemAllergen: {
+    borderLeftColor: '#FFC107',
   },
   historyItemHeader: {
     flexDirection: 'row',
@@ -437,44 +455,48 @@ const styles = StyleSheet.create({
   historyItemTimestamp: { fontSize: 12, color: '#718096' },
   allergenWarningBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFC107', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, },
   allergenWarningBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', marginLeft: 4 },
-  allergenSafeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E3E430', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, },
-  allergenSafeBadgeText: { color: '#000000', fontSize: 11, fontWeight: 'bold', marginLeft: 4 },
+  allergenSafeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4CAF50', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, },
+  allergenSafeBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', marginLeft: 4 },
   historyItemScanTextContainer: { marginBottom: 8, },
   historyItemScanText: { fontSize: 15, color: '#334155', lineHeight: 22 },
-  highlightedAllergenText: { fontWeight: 'bold', color: '#D32F2F', backgroundColor: '#FFEBEE' }, // Red and bold for allergens
+  highlightedAllergenText: { fontWeight: 'bold', color: '#D32F2F', backgroundColor: 'rgba(255,235,238,0.7)' },
   detectedAllergensSection: { marginTop: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F0F4F8' },
   detectedAllergensTitle: { fontSize: 13, fontWeight: '600', color: '#D32F2F', marginBottom: 4 },
   detectedAllergensList: { fontSize: 14, color: '#D32F2F', fontStyle: 'italic' },
   configureAllergiesPrompt: { flexDirection:'row', alignItems:'center', marginTop: 10, paddingVertical: 8, justifyContent:'center', backgroundColor:'#E3F2FD', borderRadius: 8},
   configureAllergiesText: { fontSize: 13, color: '#007AFF', fontWeight:'500' },
-
+  historyItemImagePreview: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#EAEFFD',
+  },
   emptyHistoryContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyHistoryText: { fontSize: 18, fontWeight: '600', color: '#718096', marginTop: 16, marginBottom:8, textAlign:'center' },
   emptyHistorySubText: { fontSize: 14, color: '#A0AEC0', textAlign:'center', marginBottom:20 },
   scanButton: { flexDirection:'row', backgroundColor: '#4EA8DE', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, alignItems:'center', elevation:2, shadowColor:'#4EA8DE', shadowOpacity:0.3, shadowOffset:{width:0, height:2}, shadowRadius:3 },
   scanButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-
-  // Header and Modal Styles (copied from DetectText, originally from HomeScreen)
-  header_homeScreen: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 0 : 8, paddingBottom: 10, backgroundColor: '#F8FAFF', borderBottomWidth:1, borderBottomColor:'#E0E0E0' },
-  profileContainer_homeScreen: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F4FE', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth:1, borderColor: '#E0E0E0'},
+  header_homeScreen: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 0 : 8, paddingBottom: 10, backgroundColor: '#F8FAFF', borderBottomWidth:1, borderBottomColor:'#EAF0F6' },
+  profileContainer_homeScreen: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F4FE', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth:1, borderColor: '#E2E8F0'},
   profileImage_homeScreen: { width: '100%', height: '100%', },
   profileImagePlaceholder_homeScreen: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FE'},
-  searchContainer_homeScreen: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 10 : 8, marginLeft: 12, marginRight: 12, height: 40, shadowColor: '#B0C4DE', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1, borderWidth:1, borderColor: '#E0E0E0'},
+  searchContainer_homeScreen: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 10 : 8, marginLeft: 12, marginRight: 12, height: 40, shadowColor: '#B0C4DE', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1, borderWidth:1, borderColor: '#E2E8F0'},
   searchIcon_homeScreen: { marginRight: 8, },
-  searchInput_homeScreen: { flex: 1, color: '#000000', fontSize: 14, padding: 0, margin: 0, height: '100%', },
+  searchInput_homeScreen: { flex: 1, color: '#2D3748', fontSize: 14, padding: 0, margin: 0, height: '100%', },
   notificationBellContainer_homeScreen: { padding: 8, position: 'relative', marginRight: -8 },
   notificationDot_homeScreen: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E53E3E', borderWidth: 1.5, borderColor: '#FFFFFF' },
   modalOverlay_homeScreen: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 50 },
   profileOptionsModal_homeScreen: { backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 8, minWidth: 220, position: 'absolute', zIndex: 51},
   modalProfileHeader_homeScreen: { paddingHorizontal: 16, paddingVertical:12, borderBottomWidth: 1, borderBottomColor: '#F0F4FE', marginBottom: 8, },
-  modalProfileName_homeScreen: { fontSize: 16, fontWeight: '600', color: '#000000', },
+  modalProfileName_homeScreen: { fontSize: 16, fontWeight: '600', color: '#2D3748', },
   modalProfileUsername_homeScreen: { fontSize: 13, color: '#718096', marginTop: 2, },
   modalOptionButton_homeScreen: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, },
   modalOptionIcon_homeScreen: { marginRight: 12, width: 20, alignItems:'center' },
-  modalOptionText_homeScreen: { fontSize: 15, color: '#000000', fontWeight:'500' },
+  modalOptionText_homeScreen: { fontSize: 15, color: '#2D3748', fontWeight:'500' },
   notificationsModal_homeScreen: { backgroundColor: '#FFFFFF', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 8, minWidth: 280, maxWidth: '90%', maxHeight: '70%', position: 'absolute', overflow:'hidden', zIndex: 51 },
   modalHeader_homeScreen_notifications: { paddingHorizontal: 16, paddingTop:16, paddingBottom:12, borderBottomWidth: 1, borderBottomColor: '#F0F4FE', },
-  modalTitle_homeScreen_notifications: { fontSize: 17, fontWeight: '600', color: '#000000', },
+  modalTitle_homeScreen_notifications: { fontSize: 17, fontWeight: '600', color: '#2D3748', },
   notificationItem_homeScreen: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFF', },
   notificationItemLast_homeScreen: { borderBottomWidth: 0, },
   notificationItemIcon_homeScreen: { marginRight: 12, marginTop: 2 },

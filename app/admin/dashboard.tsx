@@ -215,7 +215,7 @@ const COLORS = {
   warning: '#DD6B20',
   dark: '#1A202C',
   gray: '#718096',
-  lightGray: '#E0E0E0',
+  lightGray: '#E2E8F0',
   white: '#FFFFFF',
   background: '#F8FAFC',
 };

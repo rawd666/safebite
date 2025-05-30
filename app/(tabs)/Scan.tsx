@@ -1,5 +1,4 @@
-import { Fonts } from '@/constants/Fonts';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; // Ensure this path is correct for your project
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -24,20 +23,23 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   Vibration,
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+// import * as mime from 'react-native-mime-types'; // Not used, can be removed
 
 // Constants
 const SHARED_SCANNED_ITEMS_STORAGE_KEY = '@scannedItemsHistory';
 const LAST_SEEN_SCAN_COUNT_KEY = '@lastSeenScanCount';
-const DEEPSEEK_API_KEY = 'sk-463297a1e36a423ba2885d6b2a4ca5ca';
+const DEEPSEEK_API_KEY = 'sk-463297a1e36a423ba2885d6b2a4ca5ca'; // Store securely
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const DAILY_SCAN_GOAL = 10;
 const { width, height } = Dimensions.get('window');
+const GOOGLE_VISION_API_KEY = 'AIzaSyC1UAE-9vpDZX8VvTa5IZILzTMYvn0NMf4'; // Store securely
 
 // Interfaces
 interface SharedScannedItem {
@@ -73,7 +75,6 @@ interface DeepSeekInsight {
 }
 
 const DetectText = () => {
-  // Hooks and refs
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const soundObject = useRef<Audio.Sound | null>(null);
@@ -81,7 +82,6 @@ const DetectText = () => {
   const notificationsMenuFadeAnim = useRef(new Animated.Value(0)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
 
-  // State management
   const [image, setImage] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState('');
   const [isLoadingOCR, setIsLoadingOCR] = useState(false);
@@ -89,7 +89,7 @@ const DetectText = () => {
   const [containsAllergens, setContainsAllergens] = useState(false);
   const [detectedAllergenList, setDetectedAllergenList] = useState<string[]>([]);
   const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
-  const [hasAllergiesConfiguredState, setHasAllergiesConfiguredState] = useState(false);
+  const [hasAllergiesConfiguredState, setHasAllergiesConfiguredState] = useState(false); // Initialized to false
   const [dailyScanCount, setDailyScanCount] = useState(0);
   const [isProfileOptionsVisible, setIsProfileOptionsVisible] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
@@ -103,20 +103,18 @@ const DetectText = () => {
   const [isWavingHandVisible, setIsWavingHandVisible] = useState(false);
   const [deepSeekPrompt, setDeepSeekPrompt] = useState<string | null>(null);
 
-  // Derived values
   const waveRotation = waveAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['-15deg', '15deg'],
   });
 
-  // Animation effects
   useEffect(() => {
     Animated.timing(menuFadeAnim, {
       toValue: isProfileOptionsVisible ? 1 : 0,
       duration: 200,
       useNativeDriver: true
     }).start();
-  }, [isProfileOptionsVisible]);
+  }, [isProfileOptionsVisible, menuFadeAnim]);
 
   useEffect(() => {
     Animated.timing(notificationsMenuFadeAnim, {
@@ -124,7 +122,7 @@ const DetectText = () => {
       duration: 200,
       useNativeDriver: true
     }).start();
-  }, [isNotificationsModalVisible]);
+  }, [isNotificationsModalVisible, notificationsMenuFadeAnim]);
 
   useEffect(() => {
     if (isWavingHandVisible) {
@@ -147,9 +145,8 @@ const DetectText = () => {
     } else {
       waveAnim.setValue(0);
     }
-  }, [isWavingHandVisible]);
+  }, [isWavingHandVisible, waveAnim]);
 
-  // Memoized values
   const allergenModalContent = useMemo(() => {
     if (!currentUserProfile?.id) {
       return {
@@ -160,7 +157,7 @@ const DetectText = () => {
         details: null
       };
     }
-    if (!hasAllergiesConfiguredState) {
+    if (!hasAllergiesConfiguredState) { // This now correctly reflects profile status
       return {
         iconName: 'settings-outline' as const,
         color: '#FFC107',
@@ -181,19 +178,18 @@ const DetectText = () => {
     }
     return {
       iconName: 'checkmark-circle-outline' as const,
-      color: '#E3E430',
+      color: '#4CAF50',
       title: 'No Configured Allergens Found',
       message: 'AI did not find your configured allergens in the scanned text.',
       details: 'Always double-check labels if you have severe allergies.'
     };
   }, [currentUserProfile, hasAllergiesConfiguredState, containsAllergens, detectedAllergenList]);
 
-  // Data fetching and processing
   const fetchAppUserProfile = useCallback(async () => {
     try {
       setLoadingProfile(true);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
+
       if (authError || !user) {
         setCurrentUserProfile(null);
         setHasAllergiesConfiguredState(false);
@@ -206,23 +202,31 @@ const DetectText = () => {
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw profileError;
-
+      if (profileError) {
+        console.error('Error fetching profile data from Supabase:', profileError.message);
+        setCurrentUserProfile(null);
+        setHasAllergiesConfiguredState(false);
+        return;
+      }
+      
       if (profileData) {
         setCurrentUserProfile(profileData as UserProfile);
         const allergies = (profileData as UserProfile).allergies;
-        const hasAllergies = allergies &&
-          (
-            (Array.isArray(allergies) && allergies.length > 0) ||
-            (typeof allergies === 'string' && allergies.trim() !== '')
-          );
-        setHasAllergiesConfiguredState(!!hasAllergies);
+        let hasAllergies = false;
+        if (allergies) {
+          if (Array.isArray(allergies)) {
+            hasAllergies = allergies.filter(a => String(a).trim() !== '').length > 0;
+          } else if (typeof allergies === 'string') {
+            hasAllergies = allergies.trim() !== '';
+          }
+        }
+        setHasAllergiesConfiguredState(hasAllergies);
       } else {
         setCurrentUserProfile(null);
         setHasAllergiesConfiguredState(false);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Unexpected error in fetchAppUserProfile:', error);
       setCurrentUserProfile(null);
       setHasAllergiesConfiguredState(false);
     } finally {
@@ -239,12 +243,22 @@ const DetectText = () => {
 
       const items: SharedScannedItem[] = storedItems ? JSON.parse(storedItems) : [];
       setSharedScannedItemsHistory(items);
-      
+
       const lastSeenCount = lastSeenCountStr ? parseInt(lastSeenCountStr, 10) : 0;
       setHasNewNotifications(items.length > lastSeenCount);
     } catch (error) {
-      console.error('Error loading shared scan data:', error);
+      console.error('Error loading shared scan data from AsyncStorage:', error);
     }
+  }, []);
+  
+  const calculateDailyScanCount = useCallback((history: LocalScanResult[]) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const count = history.filter(scan => {
+        const scanDate = new Date(scan.timestamp);
+        return scanDate >= today;
+    }).length;
+    setDailyScanCount(count);
   }, []);
 
   const loadLocalScanHistory = useCallback(async () => {
@@ -268,7 +282,12 @@ const DetectText = () => {
         .order('scan_date', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading scan history from Supabase:', error.message);
+        const savedLocalHistory = await AsyncStorage.getItem('@scanHistory');
+        if (savedLocalHistory) setLocalScanHistory(JSON.parse(savedLocalHistory));
+        return;
+      }
 
       if (scans?.length) {
         const formattedScans = scans.map(scan => ({
@@ -284,133 +303,15 @@ const DetectText = () => {
         await AsyncStorage.setItem('@scanHistory', JSON.stringify(formattedScans));
       } else {
         setLocalScanHistory([]);
+        calculateDailyScanCount([]);
       }
     } catch (error) {
-      console.error('Error loading scan history:', error);
+      console.error('Unexpected error in loadLocalScanHistory:', error);
       setLocalScanHistory([]);
+      calculateDailyScanCount([]);
     }
-  }, []);
-
-  const calculateDailyScanCount = useCallback((history: LocalScanResult[]) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const count = history.filter(scan => new Date(scan.timestamp) >= today).length;
-    setDailyScanCount(count);
-  }, []);
-
-  // Image handling
-  const pickImage = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setImage(result.assets[0].uri);
-        await analyzeImage(result.assets[0].uri);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to pick image.');
-    }
-  }, []);
-
-  const takePhoto = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setImage(result.assets[0].uri);
-        await analyzeImage(result.assets[0].uri);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to take photo.');
-    }
-  }, []);
-
-  // Core scanning functionality
-  const analyzeImage = useCallback(async (imageUri: string) => {
-    if (!imageUri) return;
-
-    // Reset states
-    setIsLoadingOCR(true);
-    setIsAlertModalVisible(false);
-    setExtractedText('');
-    setContainsAllergens(false);
-    setDetectedAllergenList([]);
-    setScanInsight(null);
-    setIsInsightModalVisible(false);
-    setIsWavingHandVisible(false);
-
-    try {
-      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const apiKey = 'AIzaSyC1UAE-9vpDZX8VvTa5IZILzTMYvn0NMf4';
-      const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
-      
-      const response = await axios.post(apiUrl, {
-        requests: [{
-          image: { content: base64Image },
-          features: [{ type: 'TEXT_DETECTION' }]
-        }],
-      });
-
-      const text = response.data.responses[0]?.fullTextAnnotation?.text;
-
-      if (text) {
-        setExtractedText(text);
-        let userAllergiesForAPI: string[] = [];
-
-        if (currentUserProfile?.allergies) {
-          const rawAllergies = currentUserProfile.allergies;
-          if (typeof rawAllergies === 'string' && rawAllergies.trim() !== '') {
-            userAllergiesForAPI = rawAllergies.split(',').map(a => a.trim().toLowerCase()).filter(a => a);
-          } else if (Array.isArray(rawAllergies)) {
-            userAllergiesForAPI = rawAllergies.map(a => String(a).trim().toLowerCase()).filter(a => a);
-          }
-        }
-
-        setHasAllergiesConfiguredState(userAllergiesForAPI.length > 0);
-        const llmAnalysisResult = await fetchInsightAndAllergensFromLLM(text, userAllergiesForAPI);
-        const allergensFromLLM = llmAnalysisResult?.identified_user_allergens || [];
-        const containsAllergensFromLLM = allergensFromLLM.length > 0;
-
-        if (containsAllergensFromLLM && hasAllergiesConfiguredState) {
-          Vibration.vibrate([200, 100, 200]);
-        }
-
-        await processSuccessfulScan(text, imageUri, allergensFromLLM);
-        setContainsAllergens(containsAllergensFromLLM);
-        setDetectedAllergenList(allergensFromLLM);
-        setIsAlertModalVisible(true);
-      } else {
-        Alert.alert("No Text Found", "Could not detect text in the image.");
-      }
-    } catch (error: any) {
-      let errorMessage = 'Failed to analyze image. Please try again.';
-      if (error.response) {
-        errorMessage += `\nStatus: ${error.response.status}`;
-        if (error.response.data?.error?.message) {
-          errorMessage += `\nDetails: ${error.response.data.error.message}`;
-        } else if (typeof error.response.data === 'string') {
-          errorMessage += `\nDetails: ${error.response.data}`;
-        }
-      } else if (error.message) {
-        errorMessage += `\nDetails: ${error.message}`;
-      }
-      Alert.alert("Processing Error", errorMessage);
-    } finally {
-      setIsLoadingOCR(false);
-    }
-  }, [currentUserProfile]);
-
+  }, [calculateDailyScanCount]);
+  
   const fetchInsightAndAllergensFromLLM = useCallback(async (textToAnalyze: string, userAllergies: string[]): Promise<DeepSeekInsight | null> => {
     if (!textToAnalyze.trim()) {
       setIsWavingHandVisible(false);
@@ -423,13 +324,24 @@ const DetectText = () => {
     setDeepSeekPrompt(null);
 
     const userAllergyListString = userAllergies.length > 0 ? userAllergies.join(', ') : "none specified";
-    const prompt = `Analyze the following scanned food label text. The user has these allergies: [${userAllergyListString}]. Scanned Text: "${textToAnalyze}" Provide a JSON response with ONLY the following structure, no introductory or concluding text: {"health_summary": "A brief health summary (1-2 sentences) in English, then provide an Arabic translation prefixed with 'AR: '. Use emojis.", "identified_user_allergens": ["List user's specific allergies found in the text, considering common English and Arabic translations (e.g., 'milk' for 'حليب'). If none of the user's specific allergies are found, return an empty array []. List each allergen only once."], "actionable_health_tips": ["One or two actionable health tips related to this product in English, then provide an Arabic translation for each tip prefixed with 'AR: '. Use emojis."], "boycott_suggestion": "Analyze brand/origin for boycott status: 'Supports entity', 'Does not support entity', or 'Origin/Brand unclear'. Provide in English, then Arabic translation prefixed with 'AR: '.", "halal_status": "Analyze for Halal status: 'Appears Halal', 'Not Halal', or 'Unclear'. Provide in English, then Arabic translation prefixed with 'AR: '.", "age_factor_notes": "Any age-specific considerations in English, then Arabic translation prefixed with 'AR: '."} Keep each part concise and friendly. Do not include markdown like '*' in the JSON string values.`;
-
+    
+    const prompt = `You are analyzing text extracted from a food product label. User's allergies: [${userAllergyListString}]. Scanned Text: "${textToAnalyze.replace(/"/g, "'")}"
+Provide a JSON response with ONLY the following structure, no introductory or concluding text:
+{
+  "health_summary": "Comprehensive health summary (2-4 sentences). Include: 1. Overall assessment (e.g., Healthy Choice, Moderately Healthy, Less Healthy). 2. Key nutritional points (e.g., high/low sugar, salt, fat if mentioned in text). 3. Mention of any potentially unhealthy ingredients (e.g., HFCS, artificial sweeteners, specific preservatives if listed in text). 4. Estimated processing level (e.g. minimally processed, highly processed) based on text. Use emojis. (English, then 'AR: ' Arabic for the full summary).",
+  "identified_user_allergens": ["List user's specific allergies found in the text, considering common English and Arabic translations (e.g., 'milk' for 'حليب'). If none of the user's specific allergies are found, return an empty array []. List each allergen only once."],
+  "actionable_health_tips": ["One or two actionable health tips related to this product in English, then provide an Arabic translation for each tip prefixed with 'AR: '. Use emojis."],
+  "boycott_suggestion": "Analyze brand/origin for boycott status. State: 'Supports entity', 'Does not support entity', or 'Origin/Brand unclear for boycott determination'. CRITICALLY, provide a brief reasoning based SOLELY on identifiable brand, manufacturer, or country of origin information from the provided text. If the label lacks sufficient information for a determination, clearly state that. (English, then 'AR: ' Arabic for both status and reasoning).",
+  "halal_status": "Analyze for Halal status: 'Appears Halal', 'Not Halal', or 'Unclear'. Provide in English, then Arabic translation prefixed with 'AR: '.",
+  "age_factor_notes": "Any age-specific considerations in English, then Arabic translation prefixed with 'AR: '."
+}
+Keep each part concise and friendly. Do not include markdown like '*' in the JSON string values. Base all analysis strictly on the provided 'Scanned Text'.`;
+    
     setDeepSeekPrompt(prompt);
     const apiMessages = [
       { 
         role: 'system', 
-        content: "You are a friendly food & health advisor. Provide insights based on scanned food labels, including boycott information based on brand/origin if identifiable. Respond strictly in the specified JSON format." 
+        content: "You are a meticulous and friendly food & health advisor. Your goal is to provide detailed and accurate insights based on text extracted from food labels. This includes a thorough health assessment and careful analysis of brand/origin for boycott-related information, based *only* on the provided text. Respond strictly in the specified JSON format." 
       },
       { 
         role: 'user', 
@@ -443,8 +355,8 @@ const DetectText = () => {
         {
           model: 'deepseek-chat',
           messages: apiMessages,
-          max_tokens: 500,
-          temperature: 0.6,
+          max_tokens: 800, // Increased slightly for more detailed responses
+          temperature: 0.4, // Slightly lower for more factual/less creative responses
           response_format: { type: "json_object" }
         },
         {
@@ -457,9 +369,10 @@ const DetectText = () => {
 
       if (response.data?.choices?.[0]?.message?.content) {
         const content = response.data.choices[0].message.content;
-        try {
+        try { 
           const parsedResponse: DeepSeekInsight = JSON.parse(content);
           setScanInsight(parsedResponse);
+          setIsWavingHandVisible(true);
           return parsedResponse;
         } catch (parseError) {
           console.error("DeepSeek JSON parseError:", parseError, "Raw content:", content);
@@ -469,13 +382,16 @@ const DetectText = () => {
       }
       setScanInsight({ raw_response: "Could not retrieve insights at this time.", identified_user_allergens: [] });
       return { identified_user_allergens: [] };
-    } catch (error) {
-      console.error("Error fetching insight from DeepSeek:", error);
-      setScanInsight({ raw_response: "Sorry, an error occurred while fetching insights. Please try again later.", identified_user_allergens: [] });
+    } catch (error: any) {
+      console.error("Error fetching insight from DeepSeek:", error.response?.data || error.message);
+      let errorMsg = "Sorry, an error occurred while fetching insights.";
+      if (error.response?.data?.error?.message) {
+        errorMsg = error.response.data.error.message;
+      }
+      setScanInsight({ raw_response: errorMsg, identified_user_allergens: [] });
       return { identified_user_allergens: [] };
     } finally {
       setIsLoadingInsight(false);
-      setIsWavingHandVisible(true);
     }
   }, []);
 
@@ -498,7 +414,7 @@ const DetectText = () => {
           .single();
 
         if (dbError) {
-          console.error('Supabase DB Error saving scan:', dbError);
+          console.error('Supabase DB Error saving scan:', dbError.message);
           Alert.alert("Database Error", "Could not save scan to your history: " + dbError.message);
         } else if (insertedData) {
           dbScanId = insertedData.id;
@@ -511,7 +427,6 @@ const DetectText = () => {
       console.warn("User not logged in or profile not loaded. Scan not saved to database.");
     }
 
-    // Update local history
     const newLocalScanItem: LocalScanResult = {
       id: dbScanId || `local_${Date.now()}`,
       text,
@@ -526,16 +441,15 @@ const DetectText = () => {
     try {
       await AsyncStorage.setItem('@scanHistory', JSON.stringify(updatedLocalHistory));
     } catch (asyncStorageError) {
-      console.error("Error saving local scan history:", asyncStorageError);
+      console.error("Error saving local scan history to AsyncStorage:", asyncStorageError);
     }
 
     calculateDailyScanCount(updatedLocalHistory);
 
-    // Update shared history
     try {
       const existingSharedHistoryString = await AsyncStorage.getItem(SHARED_SCANNED_ITEMS_STORAGE_KEY);
       let sharedHistory: SharedScannedItem[] = existingSharedHistoryString ? JSON.parse(existingSharedHistoryString) : [];
-      
+
       const newSharedItem: SharedScannedItem = {
         id: dbScanId || `shared_local_${Date.now()}`,
         name: text.length > 70 ? `${text.substring(0, 67).replace(/\n/g, ' ')}...` : text.replace(/\n/g, ' '),
@@ -552,9 +466,119 @@ const DetectText = () => {
     } catch (error) {
       console.error('Error updating shared history:', error);
     }
-  }, [currentUserProfile, localScanHistory]);
+  }, [currentUserProfile, localScanHistory, calculateDailyScanCount, loadSharedScannedDataForNotifications]);
 
-  // Utility functions
+  const analyzeImage = useCallback(async (imageUri: string) => {
+    if (!imageUri) return;
+
+    setIsLoadingOCR(true);
+    setIsAlertModalVisible(false);
+    setExtractedText('');
+    setContainsAllergens(false);
+    setDetectedAllergenList([]);
+    setScanInsight(null);
+    setIsInsightModalVisible(false);
+    setIsWavingHandVisible(false);
+  
+    try {
+      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+  
+      const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
+      
+      const response = await axios.post(apiUrl, {
+        requests: [{
+          image: { content: base64Image },
+          features: [{ type: 'TEXT_DETECTION' }]
+        }],
+      });
+  
+      const text = response.data.responses[0]?.fullTextAnnotation?.text;
+  
+      if (text) {
+        setExtractedText(text);
+        let userAllergiesForAPI: string[] = [];
+
+        if (hasAllergiesConfiguredState && currentUserProfile?.allergies) {
+          const rawAllergies = currentUserProfile.allergies;
+          if (typeof rawAllergies === 'string' && rawAllergies.trim() !== '') {
+            userAllergiesForAPI = rawAllergies.split(',').map(a => a.trim().toLowerCase()).filter(a => a);
+          } else if (Array.isArray(rawAllergies)) {
+            userAllergiesForAPI = rawAllergies.map(a => String(a).trim().toLowerCase()).filter(a => a);
+          }
+        }
+  
+        const llmAnalysisResult = await fetchInsightAndAllergensFromLLM(text, userAllergiesForAPI);
+        const allergensFromLLM = llmAnalysisResult?.identified_user_allergens || [];
+        const containsAllergensFromLLM = allergensFromLLM.length > 0;
+        
+        if (containsAllergensFromLLM && hasAllergiesConfiguredState) {
+          Vibration.vibrate([200, 100, 200]);
+        }
+        
+        await processSuccessfulScan(text, imageUri, allergensFromLLM);
+        setContainsAllergens(containsAllergensFromLLM);
+        setDetectedAllergenList(allergensFromLLM);
+        setIsAlertModalVisible(true);
+      } else {
+        Alert.alert("No Text Found", "Could not detect text in the image.");
+      }  
+    } catch (error: any) {
+      let errorMessage = 'Failed to analyze image. Please try again.';
+      if (error.response) {
+        errorMessage += `\nStatus: ${error.response.status}`;
+        if (error.response.data?.error?.message) {
+          errorMessage += `\nDetails: ${error.response.data.error.message}`;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage += `\nDetails: ${error.response.data}`;
+        }
+      } else if (error.message) {
+        errorMessage += `\nDetails: ${error.message}`;
+      }
+      console.error("Analyze Image Error:", errorMessage, error);
+      Alert.alert("Processing Error", errorMessage);
+    } finally {
+      setIsLoadingOCR(false);
+    }
+  }, [currentUserProfile, hasAllergiesConfiguredState, fetchInsightAndAllergensFromLLM, processSuccessfulScan]);
+
+  const pickImage = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setImage(result.assets[0].uri);
+        await analyzeImage(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('ImagePicker Error:', e);
+      Alert.alert('Error', 'Failed to pick image.');
+    }
+  }, [analyzeImage]);
+
+  const takePhoto = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setImage(result.assets[0].uri);
+        await analyzeImage(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('Camera Error:', e);
+      Alert.alert('Error', 'Failed to take photo.');
+    }
+  }, [analyzeImage]);
+
   const shareResult = useCallback(async () => {
     if (!extractedText) return;
     try {
@@ -570,7 +594,7 @@ const DetectText = () => {
   const copyToClipboard = useCallback(async () => {
     if (!extractedText) return;
     try {
-      await AsyncStorage.setItem('@clipboard_temp', extractedText);
+      await AsyncStorage.setItem('@clipboard_temp', extractedText); 
       Alert.alert('Copied!', '(Simulated)');
       Vibration.vibrate(50);
     } catch (e) {
@@ -579,6 +603,7 @@ const DetectText = () => {
   }, [extractedText]);
 
   const handleProfilePress = useCallback(() => setIsProfileOptionsVisible(prev => !prev), []);
+  
   const handleBellPress = useCallback(async () => {
     setIsNotificationsModalVisible(true);
     if (hasNewNotifications) {
@@ -601,9 +626,19 @@ const DetectText = () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      await AsyncStorage.multiRemove(['@userToken', '@userProfile', SHARED_SCANNED_ITEMS_STORAGE_KEY, LAST_SEEN_SCAN_COUNT_KEY]);
+      await AsyncStorage.multiRemove([
+          '@userToken', 
+          '@userProfile', 
+          SHARED_SCANNED_ITEMS_STORAGE_KEY, 
+          LAST_SEEN_SCAN_COUNT_KEY,
+          '@scanHistory'
+        ]);
       setCurrentUserProfile(null);
       setHasAllergiesConfiguredState(false);
+      setLocalScanHistory([]);
+      setDailyScanCount(0);
+      setSharedScannedItemsHistory([]);
+      setHasNewNotifications(false);
       router.replace('/auth/login');
     } catch (error: any) {
       Alert.alert('Logout Error', error.message || 'An unexpected error occurred.');
@@ -611,18 +646,8 @@ const DetectText = () => {
   }, []);
 
   const handleChangeAccount = useCallback(async () => {
-    setIsProfileOptionsVisible(false);
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      await AsyncStorage.multiRemove(['@userToken', '@userProfile', SHARED_SCANNED_ITEMS_STORAGE_KEY, LAST_SEEN_SCAN_COUNT_KEY]);
-      setCurrentUserProfile(null);
-      setHasAllergiesConfiguredState(false);
-      router.replace('/auth/login');
-    } catch (error: any) {
-      Alert.alert('Logout Error', error.message || 'An unexpected error occurred.');
-    }
-  }, []);
+    await handleLogout();
+  }, [handleLogout]);
 
   const handleClearSharedScanHistory = useCallback(async () => {
     Alert.alert(
@@ -645,10 +670,17 @@ const DetectText = () => {
       ]
     );
   }, []);
-
+  
   const handleScanForBoycott = useCallback(() => {
-    Alert.alert("Feature Coming Soon", "Brand scanning for boycott info is not implemented yet.");
-  }, []);
+     Alert.alert("Feature Info", "This feature uses AI to analyze brand/origin from the scanned text for boycott-related information. Results are advisory.");
+    if (extractedText && scanInsight) {
+        setIsInsightModalVisible(true);
+    } else if (extractedText) {
+        Alert.alert("Scan First", "Please scan an item to get insights.");
+    } else {
+        Alert.alert("No Text", "Scan an item first to analyze its brand/origin.");
+    }
+  }, [extractedText, scanInsight]);
 
   const renderInsightSection = useCallback((
     title: string,
@@ -657,7 +689,9 @@ const DetectText = () => {
     iconColor?: string,
     contentStyle?: object
   ) => {
-    if (!content || (Array.isArray(content) && content.length === 0)) return null;
+    if (!content || (Array.isArray(content) && content.length === 0 && typeof content !== 'string') || (typeof content === 'string' && !content.trim()) ) {
+        return null;
+    }
     
     const displayContent = Array.isArray(content) 
       ? content.map((item, index) => `• ${item}`).join('\n')
@@ -685,27 +719,19 @@ const DetectText = () => {
     );
   }, []);
 
-  // Initialization effects
   useEffect(() => {
     const init = async () => {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera access is needed to scan documents.');
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (cameraPermission.status !== 'granted' || libraryPermission.status !== 'granted') {
+        Alert.alert('Permissions Required', 'Camera and photo library access are needed to scan items.');
       }
 
-      try {
-        const soundUrl = '';
-        if (soundUrl) {
-          const { sound } = await Audio.Sound.createAsync({ uri: soundUrl });
-          soundObject.current = sound;
-        }
-      } catch (error) {
-        console.error('Error initializing sound:', error);
-      }
-
-      fetchAppUserProfile();
+      await fetchAppUserProfile(); 
       loadLocalScanHistory();
       loadSharedScannedDataForNotifications();
+      
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 800,
@@ -718,7 +744,7 @@ const DetectText = () => {
     return () => {
       soundObject.current?.unloadAsync();
     };
-  }, []);
+  }, [fetchAppUserProfile, loadLocalScanHistory, loadSharedScannedDataForNotifications, fadeAnim]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -730,57 +756,65 @@ const DetectText = () => {
         setHasAllergiesConfiguredState(false);
         setLocalScanHistory([]);
         setDailyScanCount(0);
+        setSharedScannedItemsHistory([]);
+        setHasNewNotifications(false);
         AsyncStorage.removeItem('@scanHistory');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchAppUserProfile, loadLocalScanHistory]);
 
   useFocusEffect(
     useCallback(() => {
       loadSharedScannedDataForNotifications();
       fetchAppUserProfile();
       loadLocalScanHistory();
-    }, [])
+    }, [fetchAppUserProfile, loadLocalScanHistory, loadSharedScannedDataForNotifications])
   );
 
-  // Render
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
       <StatusBar style="dark" />
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        {/* Header */}
         <View style={styles.header_homeScreen}>
-          <Pressable onPress={handleProfilePress} style={styles.profileContainer_homeScreen}>
-            {loadingProfile ? (
-              <ActivityIndicator size="small" color="#4EA8DE" />
-            ) : currentUserProfile?.avatar_url ? (
-              <Image 
-                source={{ uri: currentUserProfile.avatar_url.trim() || 'https://placehold.co/100x100/EAF2FF/9FB0C7?text=User' }} 
-                style={styles.profileImage_homeScreen} 
-                resizeMode="cover" 
+            <Pressable onPress={handleProfilePress} style={styles.profileContainer_homeScreen}>
+              {loadingProfile ? (
+                <ActivityIndicator size="small" color="#4EA8DE" />
+              ) : currentUserProfile?.avatar_url ? (
+                <Image 
+                  source={{ uri: currentUserProfile.avatar_url.trim() || 'https://placehold.co/100x100/EAF2FF/9FB0C7?text=User' }} 
+                  style={styles.profileImage_homeScreen} 
+                  resizeMode="cover" 
+                />
+              ) : (
+                <View style={styles.profileImagePlaceholder_homeScreen}>
+                  <Ionicons name="person-outline" size={20} color="#A0AEC0" />
+                </View>
+              )}
+            </Pressable>
+
+            <View style={styles.searchContainer_homeScreen}>
+              <Ionicons name="scan-outline" size={18} color="#A0AEC0" style={styles.searchIcon_homeScreen} />
+              <TextInput 
+                placeholder="Allergen & Insight Scanner" 
+                placeholderTextColor="#A0AEC0" 
+                style={styles.searchInput_homeScreen} 
+                editable={false} 
               />
-            ) : (
-              <View style={styles.profileImagePlaceholder_homeScreen}>
-                <Ionicons name="person-outline" size={20} color="#A0AEC0" />
-              </View>
-            )}
-          </Pressable>
+            </View>
 
-          <Pressable onPress={handleBellPress} style={styles.notificationBellContainer_homeScreen}>
-            <Ionicons name="notifications-outline" size={26} color="#000000" />
-            {hasNewNotifications && <View style={styles.notificationDot_homeScreen} />}
-          </Pressable>
+            <Pressable onPress={handleBellPress} style={styles.notificationBellContainer_homeScreen}>
+              <Ionicons name="notifications-outline" size={26} color="#2D3748" />
+              {hasNewNotifications && <View style={styles.notificationDot_homeScreen} />}
+            </Pressable>
         </View>
-
-        {/* Main Content */}
+      
         <ScrollView 
           contentContainerStyle={styles.scrollContainer} 
           keyboardShouldPersistTaps="handled" 
           showsVerticalScrollIndicator={false}
         >
-          {/* Progress Card */}
           <View style={[styles.card, styles.progressCard]}>
             <Text style={styles.sectionTitle}>Daily Scan Goal</Text>
             <Text style={styles.progressText}>{dailyScanCount} / {DAILY_SCAN_GOAL} Scans Today</Text>
@@ -793,8 +827,7 @@ const DetectText = () => {
               />
             </View>
           </View>
-
-          {/* Image Container */}
+        
           <View style={styles.imageContainer}>
             {image ? (
               <Image 
@@ -809,8 +842,7 @@ const DetectText = () => {
               </Pressable>
             )}
           </View>
-
-          {/* Action Buttons */}
+        
           <View style={styles.buttonRow}>
             <Pressable 
               onPress={pickImage} 
@@ -821,7 +853,7 @@ const DetectText = () => {
               accessibilityLabel="Select from gallery"
             >
               <Ionicons name="images-outline" size={22} color="white" />
-              <Text style={[Fonts.medium, {color: '#FFFFFF', marginLeft: 8}]}>Gallery</Text>
+              <Text style={styles.buttonText}>Gallery</Text>
             </Pressable>
             
             <Pressable 
@@ -833,12 +865,11 @@ const DetectText = () => {
               ]} 
               accessibilityLabel="Take a photo"
             >
-              <Ionicons name="camera-outline" size={22} color="black" />
+              <Ionicons name="camera-outline" size={22} color="white" />
               <Text style={styles.buttonText}>Camera</Text>
             </Pressable>
           </View>
-
-          {/* Extracted Text */}
+        
           {(extractedText || isLoadingOCR) && (
             <View style={styles.textContainer}>
               <Text style={styles.sectionTitle}>Extracted Text</Text>
@@ -850,7 +881,6 @@ const DetectText = () => {
             </View>
           )}
 
-          {/* Text Actions */}
           {extractedText && !isLoadingOCR && (
             <View style={styles.actionRow}>
               <Pressable 
@@ -878,8 +908,7 @@ const DetectText = () => {
               </Pressable>
             </View>
           )}
-
-          {/* Recent Scans */}
+          
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Recent Scans (This Device)</Text>
@@ -901,7 +930,7 @@ const DetectText = () => {
                 >
                   <Image 
                     source={{ 
-                      uri: scan.imageUri.trim() || 'https://placehold.co/40x40/E2E8F0/A0AEC0?text=No+Image' 
+                      uri: scan.imageUri.trim() || 'https://placehold.co/40x40/E2E8F0/A0AEC0?text=N/A' 
                     }} 
                     style={styles.historyItemImage} 
                   />
@@ -916,10 +945,10 @@ const DetectText = () => {
                     </Text>
                     <Text style={styles.historyItemTimestamp}>
                       {new Date(scan.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}, 
-                      {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' '}{new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward-outline" size={18} color="#E0E0E0" />
+                  <Ionicons name="chevron-forward-outline" size={18} color="#CBD5E0" />
                 </View>
               ))
             ) : (
@@ -930,7 +959,6 @@ const DetectText = () => {
           </View>
         </ScrollView>
 
-        {/* Loading Overlay */}
         {isLoadingOCR && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#4EA8DE" />
@@ -938,7 +966,6 @@ const DetectText = () => {
           </View>
         )}
 
-        {/* Waving Hand (Insight Indicator) */}
         {isWavingHandVisible && !isLoadingOCR && !isLoadingInsight && scanInsight && (
           <Animated.View 
             style={[
@@ -955,7 +982,6 @@ const DetectText = () => {
           </Animated.View>
         )}
 
-        {/* Allergen Alert Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -1011,8 +1037,7 @@ const DetectText = () => {
             </Animated.View>
           </View>
         </Modal>
-
-        {/* Profile Options Modal */}
+        
         <Modal
           animationType="fade"
           transparent={true}
@@ -1026,7 +1051,7 @@ const DetectText = () => {
                   styles.profileOptionsModal_homeScreen, 
                   { 
                     opacity: menuFadeAnim, 
-                    top: insets.top + 10, 
+                    top: insets.top + (Platform.OS === 'ios' ? 50 : 60), 
                     left: 16 
                   }
                 ]}
@@ -1035,7 +1060,7 @@ const DetectText = () => {
                   style={styles.modalOptionButton_homeScreen} 
                   onPress={handleVisitProfile}
                 >
-                  <Ionicons name="person-outline" size={20} color="#000000" style={styles.modalOptionIcon_homeScreen} />
+                  <Ionicons name="person-circle-outline" size={22} color="#2D3748" style={styles.modalOptionIcon_homeScreen} />
                   <Text style={styles.modalOptionText_homeScreen}>Visit Profile</Text>
                 </TouchableOpacity>
                 
@@ -1043,7 +1068,7 @@ const DetectText = () => {
                   style={styles.modalOptionButton_homeScreen} 
                   onPress={handleChangeAccount}
                 >
-                  <Ionicons name="swap-horizontal-outline" size={20} color="#000000" style={styles.modalOptionIcon_homeScreen} />
+                  <Ionicons name="swap-horizontal-outline" size={22} color="#2D3748" style={styles.modalOptionIcon_homeScreen} />
                   <Text style={styles.modalOptionText_homeScreen}>Change Account</Text>
                 </TouchableOpacity>
                 
@@ -1051,15 +1076,14 @@ const DetectText = () => {
                   style={styles.modalOptionButton_homeScreen} 
                   onPress={handleLogout}
                 >
-                  <Ionicons name="log-out-outline" size={20} color="#E53E3E" style={styles.modalOptionIcon_homeScreen} />
+                  <Ionicons name="log-out-outline" size={22} color="#E53E3E" style={styles.modalOptionIcon_homeScreen} />
                   <Text style={[styles.modalOptionText_homeScreen, { color: '#E53E3E' }]}>Logout</Text>
                 </TouchableOpacity>
               </Animated.View>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
-
-        {/* Notifications Modal */}
+        
         <Modal
           animationType="fade"
           transparent={true}
@@ -1073,7 +1097,7 @@ const DetectText = () => {
                   styles.notificationsModal_homeScreen, 
                   { 
                     opacity: notificationsMenuFadeAnim, 
-                    top: insets.top + 10, 
+                    top: insets.top + (Platform.OS === 'ios' ? 50 : 60), 
                     right: 16 
                   }
                 ]}
@@ -1091,7 +1115,7 @@ const DetectText = () => {
                         style={[
                           styles.notificationItem_homeScreen, 
                           index === sharedScannedItemsHistory.slice(0, 15).length - 1 && 
-                            styles.notificationItemLast_homeScreen
+                          styles.notificationItemLast_homeScreen
                         ]}
                       >
                         <Ionicons 
@@ -1109,7 +1133,7 @@ const DetectText = () => {
                           </Text>
                           <Text style={styles.notificationItemTimestamp_homeScreen}>
                             {new Date(item.scannedAt).toLocaleDateString()} 
-                            {new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {' '}{new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </Text>
                         </View>
                       </View>
@@ -1134,8 +1158,7 @@ const DetectText = () => {
             </View>
           </TouchableWithoutFeedback>
         </Modal>
-
-        {/* Insight Modal */}
+        
         <Modal
           animationType="slide"
           transparent={true}
@@ -1145,86 +1168,89 @@ const DetectText = () => {
           <TouchableWithoutFeedback onPress={() => setIsInsightModalVisible(false)}>
             <View style={styles.insightModalOverlay} />
           </TouchableWithoutFeedback>
-          
+
           <View style={styles.insightModalContainer}>
-            <View style={styles.insightModalHeader}>
-              <Text style={styles.insightModalTitle}>Quick Insight | نصائح فورية</Text>
+              <View style={styles.insightModalHeader}>
+                <Text style={styles.insightModalTitle}>Quick Insight | نصائح فورية</Text>
+                <TouchableOpacity 
+                  onPress={() => setIsInsightModalVisible(false)} 
+                  style={styles.insightCloseButton}
+                >
+                  <Ionicons name="close-circle" size={28} color="#A0AEC0" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.insightModalContentScroll}>
+                  {isLoadingInsight ? (
+                    <ActivityIndicator size="large" color="#4EA8DE" style={{ marginVertical: 30 }} />
+                  ) : scanInsight ? (
+                      <>
+                          {renderInsightSection(
+                            "Health Summary | ملخص صحي", 
+                            scanInsight.health_summary, 
+                            "fitness-outline", 
+                            "#3498DB"
+                          )}
+                          
+                          {(scanInsight.identified_user_allergens?.length ?? 0) > 0 && hasAllergiesConfiguredState &&
+                            renderInsightSection(
+                              "Your Allergens Found | تم العثور على مسببات الحساسية الخاصة بك", 
+                              scanInsight.identified_user_allergens, 
+                              "alert-circle-outline", 
+                              "#E74C3C", 
+                              styles.insightAllergenText
+                            )
+                          }
+                          
+                          {(scanInsight.actionable_health_tips?.length ?? 0) > 0 &&
+                            renderInsightSection(
+                              "Health Tips | نصائح صحية", 
+                              scanInsight.actionable_health_tips, 
+                              "bulb-outline", 
+                              "#2ECC71"
+                            )
+                          }
+
+                          {renderInsightSection(
+                            "Brand/Origin Info | معلومات العلامة التجارية/المنشأ", 
+                            scanInsight.boycott_suggestion, 
+                            "information-circle-outline", 
+                            "#9B59B6"
+                          )}
+
+                          {renderInsightSection(
+                            "Halal Status | حالة الحلال", 
+                            scanInsight.halal_status, 
+                            "checkmark-done-circle-outline", 
+                            "#1ABC9C"
+                          )}
+
+                          {renderInsightSection(
+                            "Age Considerations | اعتبارات العمر", 
+                            scanInsight.age_factor_notes, 
+                            "body-outline", 
+                            "#F39C12"
+                          )}
+
+                          {scanInsight.raw_response && !scanInsight.health_summary && (
+                            <View style={styles.insightSection}>
+                                <Text style={styles.insightSectionTitle}>Raw AI Response</Text>
+                                <Text style={styles.insightText}>{scanInsight.raw_response}</Text>
+                            </View>
+                          )}
+                      </>
+                  ) : (
+                    <Text style={styles.insightText}>No insights available for this scan, or still loading.</Text>
+                  )}
+              </ScrollView>
+
               <TouchableOpacity 
-                onPress={() => setIsInsightModalVisible(false)} 
-                style={styles.insightCloseButton}
+                style={styles.scanForBoycottButton} 
+                onPress={handleScanForBoycott}
               >
-                <Ionicons name="close-circle" size={28} color="#A0AEC0" />
+                  <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.scanForBoycottButtonText}>View Brand/Origin Analysis</Text>
               </TouchableOpacity>
-            </View>
-            
-            <ScrollView contentContainerStyle={styles.insightModalContentScroll}>
-              {isLoadingInsight ? (
-                <ActivityIndicator size="large" color="#4EA8DE" style={{ marginVertical: 30 }} />
-              ) : scanInsight ? (
-                <>
-                  {renderInsightSection(
-                    "Health Summary | ملخص صحي", 
-                    scanInsight.health_summary, 
-                    "fitness-outline", 
-                    "#3498DB"
-                  )}
-                  
-                  {(scanInsight.identified_user_allergens?.length ?? 0) > 0 &&
-                    renderInsightSection(
-                      "Your Allergens Found | تم العثور على مسببات الحساسية الخاصة بك", 
-                      scanInsight.identified_user_allergens, 
-                      "alert-circle-outline", 
-                      "#E74C3C", 
-                      styles.insightAllergenText
-                    )
-                  }
-                  
-                  {(scanInsight.actionable_health_tips?.length ?? 0) > 0 &&
-                    renderInsightSection(
-                      "Health Tips | نصائح صحية", 
-                      scanInsight.actionable_health_tips, 
-                      "bulb-outline", 
-                      "#2ECC71"
-                    )
-                  }
-                  
-                  {renderInsightSection(
-                    "Brand/Origin Info | معلومات العلامة التجارية/المنشأ", 
-                    scanInsight.boycott_suggestion, 
-                    "information-circle-outline", 
-                    "#9B59B6"
-                  )}
-                  
-                  {renderInsightSection(
-                    "Halal Status | حالة الحلال", 
-                    scanInsight.halal_status, 
-                    "checkmark-done-circle-outline", 
-                    "#1ABC9C"
-                  )}
-                  
-                  {renderInsightSection(
-                    "Age Considerations | اعتبارات العمر", 
-                    scanInsight.age_factor_notes, 
-                    "body-outline", 
-                    "#F39C12"
-                  )}
-                  
-                  {scanInsight.raw_response && !scanInsight.health_summary && (
-                    <Text style={styles.insightText}>{scanInsight.raw_response}</Text>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.insightText}>No insights available for this scan.</Text>
-              )}
-            </ScrollView>
-            
-            <TouchableOpacity 
-              style={styles.scanForBoycottButton} 
-              onPress={handleScanForBoycott}
-            >
-              <Ionicons name="camera-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.scanForBoycottButtonText}>Scan Brand for Info</Text>
-            </TouchableOpacity>
           </View>
         </Modal>
       </Animated.View>
@@ -1232,7 +1258,6 @@ const DetectText = () => {
   );
 };
 
-// Styles remain the same as in your original code
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F8FAFF' },
   container: { flex: 1, backgroundColor: '#F8FAFF' },
@@ -1242,48 +1267,44 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 0 : 5,
-    paddingBottom: 5,
+    paddingTop: Platform.OS === 'ios' ? 0 : 8,
+    paddingBottom: 10,
     backgroundColor: '#F8FAFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAF0F6',
+    marginBottom: 16,
   },
-  profileContainer_homeScreen: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F4FE', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#E0E0E0' },
+  profileContainer_homeScreen: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F4FE', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
   profileImage_homeScreen: { width: '100%', height: '100%', },
   profileImagePlaceholder_homeScreen: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FE' },
-  searchContainer_homeScreen: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 10 : 8, marginLeft: 12, marginRight: 12, height: 40, shadowColor: '#B0C4DE', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#E0E0E0' },
+  searchContainer_homeScreen: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 10 : 8, marginLeft: 12, marginRight: 12, height: 40, shadowColor: '#B0C4DE', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#E2E8F0' },
   searchIcon_homeScreen: { marginRight: 8, },
-  searchInput_homeScreen: { flex: 1, color: '#000000', fontSize: 14, padding: 0, margin: 0, height: '100%', },
+  searchInput_homeScreen: { flex: 1, color: '#2D3748', fontSize: 14, padding: 0, margin: 0, height: '100%', },
   notificationBellContainer_homeScreen: { padding: 8, position: 'relative', marginRight: -8 },
   notificationDot_homeScreen: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E53E3E', borderWidth: 1.5, borderColor: '#FFFFFF' },
 
-  card: { 
-    backgroundColor: 'rgba(255, 255, 255, 0.76)', 
-    borderRadius: 16, 
-    padding: 20, 
-    marginBottom: 24, 
-    borderWidth: 1, 
-    borderColor: '#E0E0E0' 
-  },
+  card: { backgroundColor: 'white', borderRadius: 16, padding: 20, marginBottom: 24, shadowColor: '#9FB0C7', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 3, borderWidth: Platform.OS === 'ios' ? 0 : 1, borderColor: '#E2E8F0' },
   progressCard: { paddingBottom: 15, },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#000000', },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#2D3748', },
   progressText: { fontSize: 14, marginBottom: 10, fontWeight: '500', color: '#4A5568' },
   progressBarBackground: { height: 10, borderRadius: 5, marginTop: 4, overflow: 'hidden', backgroundColor: '#EAF0F6', },
   progressBarFill: { height: '100%', borderRadius: 5, backgroundColor: '#4EA8DE', },
 
   imageContainer: { marginBottom: 24, borderRadius: 16, overflow: 'hidden', shadowColor: '#9FB0C7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 2, },
   image: { width: '100%', height: 250, backgroundColor: '#EAEFFD', },
-  placeholder: { height: 250, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FE', borderRadius: 16, borderWidth: 1, borderColor: '#E0E0E0' },
+  placeholder: { height: 250, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FE', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   placeholderText: { marginTop: 12, fontSize: 15, fontWeight: '500', color: '#718096', },
 
   buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16, },
-  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#4EA8DE', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, },
+  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#4EA8DE', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, shadowColor: '#4EA8DE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3, },
   actionButtonPressed: { backgroundColor: '#4C6BFF', transform: [{ scale: 0.98 }] },
-  cameraButton: { backgroundColor: '#E3E430' },
-  buttonText: { fontFamily: 'mediumFont', color: 'black', marginLeft: 10,  fontSize: 16, },
+  cameraButton: { backgroundColor: '#4A5568' },
+  buttonText: { color: 'white', marginLeft: 10, fontWeight: '600', fontSize: 15, },
 
-  textContainer: { backgroundColor: 'white', borderRadius: 16, padding: 20, marginBottom: 24, shadowColor: '#9FB0C7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2, borderWidth: Platform.OS === 'ios' ? 0 : 1, borderColor: '#E0E0E0' },
+  textContainer: { backgroundColor: 'white', borderRadius: 16, padding: 20, marginBottom: 24, shadowColor: '#9FB0C7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2, borderWidth: Platform.OS === 'ios' ? 0 : 1, borderColor: '#E2E8F0' },
   textScroll: { maxHeight: 180, },
   extractedText: { fontSize: 15, lineHeight: 23, color: '#334155', },
-
+  
   actionRow: { flexDirection: 'row', justifyContent: 'space-evenly', marginBottom: 24, gap: 12, },
   smallActionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 25, backgroundColor: '#EDF2F7', },
   smallActionButtonPressed: { opacity: 0.7, transform: [{ scale: 0.97 }] },
@@ -1294,7 +1315,7 @@ const styles = StyleSheet.create({
 
   historyItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F7FAFC', },
   historyItemLast: { borderBottomWidth: 0, },
-  historyItemImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12, backgroundColor: '#E0E0E0' },
+  historyItemImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12, backgroundColor: '#E2E8F0' },
   historyItemTextContainer: { flex: 1 },
   historyItemText: { fontSize: 14, fontWeight: '500', color: '#4A5568', },
   historyItemTimestamp: { fontSize: 12, color: '#718096', },
@@ -1306,7 +1327,7 @@ const styles = StyleSheet.create({
   modalCenteredView_allergen: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 21 },
   modalView_allergen: { borderRadius: 20, padding: 25, paddingTop: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2, }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5, width: Platform.OS === 'web' ? '50%' : '88%', maxWidth: 400, backgroundColor: 'white', },
   modalIconContainer_allergen: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 20, marginTop: -55, backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
-  modalTitle_allergen: { marginBottom: 15, textAlign: 'center', fontSize: 22, fontWeight: 'bold', color: '#000000', },
+  modalTitle_allergen: { marginBottom: 15, textAlign: 'center', fontSize: 22, fontWeight: 'bold', color: '#2D3748', },
   modalMessage_allergen: { marginBottom: 10, textAlign: 'center', fontSize: 16, lineHeight: 22, color: '#4A5568', },
   modalDetails_allergen: { marginBottom: 25, textAlign: 'center', fontSize: 14, fontStyle: 'italic', lineHeight: 20, color: '#718096', },
   modalButton_allergen: { borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, elevation: 2, marginTop: 10, width: '100%', alignItems: 'center', },
@@ -1316,15 +1337,15 @@ const styles = StyleSheet.create({
   modalOverlay_homeScreen: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 50 },
   profileOptionsModal_homeScreen: { backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 8, minWidth: 220, position: 'absolute', zIndex: 51 },
   modalProfileHeader_homeScreen: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F4FE', marginBottom: 8, },
-  modalProfileName_homeScreen: { fontSize: 16, fontWeight: '600', color: '#000000', },
+  modalProfileName_homeScreen: { fontSize: 16, fontWeight: '600', color: '#2D3748', },
   modalProfileUsername_homeScreen: { fontSize: 13, color: '#718096', marginTop: 2, },
   modalOptionButton_homeScreen: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, },
   modalOptionIcon_homeScreen: { marginRight: 12, width: 20, alignItems: 'center' },
-  modalOptionText_homeScreen: { fontSize: 15, color: '#000000', fontWeight: '500' },
-
+  modalOptionText_homeScreen: { fontSize: 15, color: '#2D3748', fontWeight: '500' },
+  
   notificationsModal_homeScreen: { backgroundColor: '#FFFFFF', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 8, minWidth: 280, maxWidth: '90%', maxHeight: '70%', position: 'absolute', overflow: 'hidden', zIndex: 51 },
   modalHeader_homeScreen_notifications: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F4FE', },
-  modalTitle_homeScreen_notifications: { fontSize: 17, fontWeight: '600', color: '#000000', },
+  modalTitle_homeScreen_notifications: { fontSize: 17, fontWeight: '600', color: '#2D3748', },
   notificationItem_homeScreen: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFF', },
   notificationItemLast_homeScreen: { borderBottomWidth: 0, },
   notificationItemIcon_homeScreen: { marginRight: 12, marginTop: 2 },
@@ -1393,7 +1414,7 @@ const styles = StyleSheet.create({
   insightSectionTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#3A5FD8',
+    color: '#4EA8DE',
 
   },
   insightSectionContent: {
@@ -1403,12 +1424,12 @@ const styles = StyleSheet.create({
   },
   insightAllergenText: {
     color: '#C53030',
-    fontWeight: '600',
+    fontWeight: '600', 
     backgroundColor: '#FED7D7',
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 2, 
     borderRadius: 4,
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-start', 
     overflow: 'hidden',
     marginTop: 4,
     marginBottom: 4,
@@ -1442,7 +1463,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 16,
     marginHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: Platform.OS === 'ios' ? Math.max(10, Dimensions.get('window').height * 0.02 + (useSafeAreaInsets().bottom /2) ) : 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,

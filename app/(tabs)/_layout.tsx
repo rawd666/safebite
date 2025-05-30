@@ -20,22 +20,29 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#E3E430',
-        tabBarInactiveTintColor: '#fff',
-        tabBarShowLabel: false,
+        tabBarInactiveTintColor: '#FFFFFF',
         tabBarStyle: {
           backgroundColor: '#4EA8DE',
-          height: 60,
-          paddingTop: 10,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '500',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
-              size={26}
+              size={20}
               color={color}
             />
           ),
@@ -45,10 +52,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="shop"
         options={{
+          title: 'Shop',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'cart' : 'cart-outline'}
-              size={26}
+              size={20}
               color={color}
             />
           ),
@@ -58,41 +66,45 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="Scan"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.scanButtonOuter}>
-              <View style={styles.scanButtonInner}>
-                <MaterialCommunityIcons
-                  name="barcode-scan"
-                  size={32}
-                  color="#000"
-                />
-              </View>
+          title: 'Scan',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.scanButtonInner}>
+              <MaterialCommunityIcons
+                name="barcode-scan"
+                size={28}
+                color="black"
+              />
             </View>
           ),
-          tabBarLabel: () => null,
+           tabBarLabel: () => null,
+           tabBarIconStyle: {
+               marginTop: 5,
+           }
         }}
       />
 
-      <Tabs.Screen
+       <Tabs.Screen
         name="settings"
         options={{
+          title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'settings' : 'settings-outline'}
-              size={26}
+              size={20}
               color={color}
             />
           ),
         }}
       />
 
-      <Tabs.Screen
+       <Tabs.Screen
         name="profile"
         options={{
+          title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
-              size={26}
+              size={20}
               color={color}
             />
           ),
@@ -103,21 +115,20 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  scanButtonOuter: {
-    position: 'absolute',
-    top: -40,
+  offlineContainer: {
+    backgroundColor: '#FF3B30',
+    padding: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 70,
-    height: 70,
+  },
+  offlineText: {
+    color: 'white',
+    fontSize: 12,
   },
   scanButtonInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#E3E430',
-    borderWidth: 3,
-    borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },

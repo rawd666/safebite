@@ -317,6 +317,7 @@ const SettingsScreen = () => {
           title="Delete Account"
           onPress={() => setIsDeleteAccountModalVisible(true)}
           backgroundColor='#E53E3E'
+          textStyle={{ color: 'white'}}
         />
         
         <Text style={styles.appVersionText}>App Version 1.0.0</Text>

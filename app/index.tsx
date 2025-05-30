@@ -33,7 +33,7 @@ export default function IndexScreen() {
   if (session) {
     return <Redirect href="/(tabs)" />;
   } else {
-    return <Redirect href="/Onboarding2" />;
+    return <Redirect href="/auth/login" />;
   }
 }
 

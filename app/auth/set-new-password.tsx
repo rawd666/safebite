@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { BackgroundShapes } from '@/styles/globalStyles';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -61,6 +62,7 @@ const SetNewPasswordScreen = () => {
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <BackgroundShapes />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -162,7 +164,7 @@ const SetNewPasswordScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#ffffff',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#2D3748',
     marginBottom: 8,
   },
   subtitle: {
@@ -192,14 +194,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.76)',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    borderColor: '#E0E0E0',
+    borderWidth: 1,
   },
   inputContainer: {
     marginBottom: 20,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#CBD5E0',
     borderRadius: 5,
     paddingHorizontal: 12,
     height: 45,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: '100%',
-    color: '#000000',
+    color: '#2D3748',
     fontSize: 16,
   },
   passwordToggle: {
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#4EA8DE',
-    borderRadius: 5,
+    borderRadius: 24,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,

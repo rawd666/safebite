@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import { Link, router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const LoginScreen = () => {
@@ -148,7 +148,10 @@ const LoginScreen = () => {
       <BackgroundShapes />
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.title}>SafeBite</Text>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={{width: 350, height: 97, marginBottom: 10, resizeMode: 'contain'}}
+            />
           </View>
 
           <View style={styles.card}>
